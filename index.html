@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nexplore Fall Placements — TX/FL/GA/SC Live Sites Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #161d2e;
+    --panel2: #1d2540;
+    --border: #2a3450;
+    --text: #e8ecf5;
+    --muted: #93a0bf;
+    --accent: #4f8cff;
+    --open: #ff6b5e;
+    --filled: #37c977;
+    --mix: #ffb545;
+    --instructor: #4fd1ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 20px 28px 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #141a2c, #0f1420);
+  }
+  header h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+    font-weight: 700;
+  }
+  header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .stats {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .stat b { font-size: 16px; display:block; }
+  .stat.open b { color: var(--open); }
+  .stat.filled b { color: var(--filled); }
+  .stat.sites b { color: var(--accent); }
+  .stat.regions b { color: var(--mix); }
+  .stat.instructor b { color: var(--instructor); }
+
+  #map {
+    height: 560px;
+    width: 100%;
+    border-bottom: 1px solid var(--border);
+  }
+  .legend {
+    padding: 10px 28px;
+    background: var(--panel);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .legend .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+  .legend .dot.open { background: var(--open); }
+  .legend .dot.mix { background: var(--mix); }
+  .legend .dot.filled { background: var(--filled); }
+  .legend .dot.instructor { background: var(--instructor); }
+
+  .controls {
+    padding: 14px 28px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .controls input, .controls select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .controls input { flex: 1; min-width: 180px; }
+
+  main { padding: 8px 28px 40px; }
+  .region-block {
+    margin-top: 26px;
+  }
+  .region-title {
+    font-size: 17px;
+    font-weight: 700;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+  }
+  .region-title .state-tag {
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--accent);
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+  .region-title .count {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .site-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 14px;
+  }
+  .site-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    position: relative;
+  }
+  .site-card.no-open { opacity: 0.55; }
+  .site-name {
+    font-weight: 700;
+    font-size: 14.5px;
+    margin-bottom: 2px;
+  }
+  .site-loc {
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+  .class-row {
+    font-size: 12.5px;
+    padding: 5px 0;
+    border-top: 1px dashed var(--border);
+  }
+  .class-row:first-of-type { border-top: none; }
+  .class-row .prog { font-weight: 600; }
+  .class-row.filled { color: var(--muted); }
+  .badge {
+    display:inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 5px;
+    margin-left: 6px;
+  }
+  .badge.open { background: rgba(255,107,94,0.18); color: var(--open); }
+  .badge.filled { background: rgba(55,201,119,0.18); color: var(--filled); }
+  .no-open-note { font-size: 12px; color: var(--muted); font-style: italic; }
+  .filled-hover-wrap .hint { text-decoration: underline dotted; color: var(--muted); font-size: 10.5px; margin-left: 4px; }
+  .filled-details {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 4px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  }
+  .filled-hover-wrap:hover .filled-details { display: block; }
+  .filled-detail-row { font-size: 11.5px; padding: 4px 0; border-top: 1px dashed var(--border); }
+  .filled-detail-row:first-child { border-top: none; }
+  .maplibregl-popup-content { background: var(--panel); color: var(--text); border-radius: 10px; padding: 12px 14px; }
+  .maplibregl-popup-tip { border-top-color: var(--panel) !important; border-bottom-color: var(--panel) !important; }
+  .maplibregl-popup-close-button { color: var(--muted); font-size: 16px; }
+  .maplibregl-ctrl-attrib { background: rgba(15,20,32,0.7) !important; color: var(--muted) !important; }
+  .maplibregl-ctrl-attrib a { color: var(--muted) !important; }
+  .site-marker { width:16px; height:16px; border-radius:50%; border:1.5px solid #0f1420; cursor:pointer; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); }
+  .instructor-marker { width:10px; height:10px; border-radius:50%; border:1px solid #0f1420; background:#4fd1ff; opacity:0.85; cursor:pointer; }
+  .style-toggle-ctrl button { width:29px; height:29px; font-size:15px; background:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .style-toggle-ctrl button:hover { background:#f2f2f2; }
+  .popup-title { font-weight:700; font-size:13px; margin-bottom:2px; }
+  .popup-addr { font-size:11px; color: var(--muted); margin-bottom:6px; }
+  .popup-class { font-size:11.5px; padding:2px 0; }
+
+  .addr-search-wrap { position: relative; margin-left: auto; display:flex; align-items:center; gap:6px; }
+  .addr-search-wrap input {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    width: 220px;
+  }
+  .addr-search-wrap button {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    padding: 6.5px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .addr-search-wrap button:hover { opacity: 0.9; }
+  .addr-search-wrap button:disabled { opacity: 0.6; cursor: default; }
+  .addr-search-status {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .addr-search-status.error { color: var(--open); }
+  .address-marker { font-size: 28px; line-height: 1; cursor: pointer; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+  .combo-search-wrap { position: relative; margin-left: 10px; }
+  .combo-search-wrap input {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    width: 260px;
+  }
+  .combo-results {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+  }
+  .combo-results.open { display: block; }
+  .combo-result-item {
+    padding: 7px 10px;
+    font-size: 12.5px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .combo-result-item:last-child { border-bottom: none; }
+  .combo-result-item:hover { background: var(--panel); }
+  .combo-result-item b { flex: 1; }
+  .combo-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 5px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .combo-tag.site { background: rgba(79,140,255,0.2); color: var(--accent); }
+  .combo-tag.instructor { background: rgba(79,209,255,0.2); color: var(--instructor); }
+  .combo-result-empty { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Nexplore Fall Placements — Live Site Map (TX / FL / GA / SC)</h1>
+  <p>Pulled live from the sandbox placement system · Auto-updated daily</p>
+  <div class="stats">
+    <div class="stat sites"><b>63</b>sites</div>
+    <div class="stat regions"><b>33</b>regions</div>
+    <div class="stat open"><b>78</b>open placements</div>
+    <div class="stat filled"><b>128</b>filled classes</div>
+    <div class="stat instructor"><b>340</b>instructors nearby</div>
+  </div>
+</header>
+
+<div id="map"></div>
+<div class="legend">
+  <span><span class="dot open"></span>Has open placement(s)</span>
+  <span><span class="dot mix"></span>Mixed program (some open)</span>
+  <span><span class="dot filled"></span>Fully staffed</span>
+  <span><span class="dot instructor"></span>Instructor (approx. by zip)</span>
+  <div class="addr-search-wrap">
+    <input type="text" id="addressSearch" placeholder="Search any address..." onkeydown="if(event.key==='Enter'){event.preventDefault();runAddressSearch();}">
+    <button type="button" id="addressSearchBtn" onclick="runAddressSearch()">Go</button>
+    <div class="addr-search-status" id="addrSearchStatus"></div>
+  </div>
+  <div class="combo-search-wrap">
+    <input type="text" id="comboSearch" placeholder="Find a site or instructor..." oninput="comboSearchRun()" onfocus="comboSearchRun()">
+    <div class="combo-results" id="comboResults"></div>
+  </div>
+  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+    <input type="checkbox" id="toggleInstructors" checked onchange="toggleInstructorLayer()">
+ Show instructors
+  </label>
+</div>
+
+<div class="controls">
+  <input id="searchBox" type="text" placeholder="Search by site, city, program, or region..." oninput="renderList()">
+  <select id="stateFilter" onchange="renderList()">
+    <option value="">All States</option>
+    <option value="TX">Texas</option>
+    <option value="FL">Florida</option>
+    <option value="GA">Georgia</option>
+    <option value="SC">South Carolina</option>
+  </select>
+  <select id="statusFilter" onchange="renderList()">
+    <option value="">All Sites</option>
+    <option value="open">Only sites with open placements</option>
+    <option value="filled">Only fully-staffed sites</option>
+  </select>
+</div>
+
+<main id="mainList"></main>
+
+<script>
+const DATA = [{"id":1,"name":"OYC - Hibiscus Elementary","state":"FL","region":"North Miami","city":"Miami","address":"18701 NW 1st. Ave","zip":"33169","lat":25.9463176,"lon":-80.2022637,"classes":[{"program":"Wacky Science","course":"Course","instructor":"Gabriela Rosenthal","status":"filled","time":"Mon 4:00PM-5:00PM","startDate":"Sep 14"}]},{"id":2,"name":"Wings for Kids - Fickett Elementary","state":"GA","region":"Atlanta","city":"Atlanta","address":"3935 Rux Rd SW,","zip":"30331","lat":33.6965902,"lon":-84.5159746,"classes":[{"program":"Wacky Science","course":"Course","instructor":"","status":"open","time":"Thu 4:10PM-4:40PM","startDate":"Sep 17"},{"program":"Strawbees","course":"Course","instructor":"","status":"open","time":"Tue 3:00PM-3:30PM","startDate":"Sep 15"}]},{"id":3,"name":"Centro Mater East","state":"FL","region":"Miami Beach & Downtown Miami","city":"Miami","address":"418 SW 4th Ave.","zip":"33130","lat":25.8494759,"lon":-80.2579786,"classes":[{"program":"Multiple Programs","course":"","instructor":"","status":"open","time":"Fri 3:30PM-4:30PM","startDate":"Aug 28"}]},{"id":4,"name":"Arbor Montessori","state":"GA","region":"DeKalb County","city":"Decatur","address":"2998 Lavista Road","zip":"30033","lat":33.8257049,"lon":-84.2849889,"classes":[{"program":"Makers Club","course":"Course","instructor":"","status":"open","time":"Wed 3:00PM-4:00PM","startDate":"Sep 16"},{"program":"Energize","course":"Course","instructor":"","status":"open","time":"Wed 3:15PM-4:15PM","startDate":"Sep 16"},{"program":"Coding with Scratch","course":"Course","instructor":"","status":"open","time":"Tue 3:00PM-4:00PM","startDate":"Sep 15"},{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"","status":"open","time":"Tue 3:15PM-4:15PM","startDate":"Sep 15"},{"program":"3D Printing","course":"Start+","instructor":"","status":"open","time":"Mon 3:00PM-4:00PM","startDate":"Sep 14"}]},{"id":5,"name":"Nova University School","state":"FL","region":"South Broward","city":"Davie","address":"3375 SW 75 Avenue","zip":"33314","lat":26.0671637,"lon":-80.2255518,"classes":[{"program":"Little Detectives","course":"Course","instructor":"Nancy Bonise Charlemond","status":"filled","time":"Fri 3:30PM-4:30PM","startDate":"Aug 28"},{"program":"Pottery","course":"Core","instructor":"Gabriela Rosenthal","status":"filled","time":"Thu 3:30PM-4:30PM","startDate":"Aug 27"},{"program":"Art Rods","course":"Creations","instructor":"Patricia Romero","status":"filled","time":"Thu 3:30PM-4:30PM","startDate":"Aug 27"},{"program":"Electronic Game Design","course":"Course","instructor":"","status":"open","time":"Tue 3:30PM-4:30PM","startDate":"Aug 25"},{"program":"Wacky Science","course":"Course","instructor":"Patricia Romero","status":"filled","time":"Wed 3:30PM-4:30PM","startDate":"Aug 26"},{"program":"Makers Club","course":"Course","instructor":"Patricia Romero","status":"filled","time":"Mon 3:30PM-4:30PM","startDate":"Aug 24"}]},{"id":6,"name":"The Cornerstone School","state":"FL","region":"Marion County","city":"Ocala","address":"2313 SE Lake Weir Avenue","zip":"34471","lat":29.1690577,"lon":-82.1080884,"classes":[{"program":"Video Production","course":"Course","instructor":"","status":"open","time":"Fri 3:30PM-4:30PM","startDate":"Sep 18"},{"program":"Pottery","course":"Core","instructor":"","status":"open","time":"Fri 3:30PM-4:30PM","startDate":"Sep 18"},{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"","status":"open","time":"Fri 2:45PM-3:30PM","startDate":"Sep 18"}]},{"id":7,"name":"Basilica School of St. Mary Star of the Sea","state":"FL","region":"Key West","city":"Key West","address":"700 Truman Avenue","zip":"33040","lat":24.552623,"lon":-81.79671,"classes":[{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"","status":"open","time":"Mon 3:15PM-4:15PM","startDate":"Sep 21"},{"program":"Little Doctors","course":"Course","instructor":"","status":"open","time":"Mon 3:15PM-4:15PM","startDate":"Sep 14"},{"program":"3D Printing","course":"Start+","instructor":"","status":"open","time":"Tue 4:00PM-5:00PM","startDate":"Sep 8"}]},{"id":8,"name":"Harmony Science Academy","state":"TX","region":"San Antonio","city":"Leander","address":"13415 FM 2243","zip":"78641","lat":30.5754749,"lon":-97.9134536,"classes":[{"program":"Web Design","course":"Course","instructor":"","status":"open","time":"Wed 3:30PM-4:30PM","startDate":"Aug 26"}]},{"id":9,"name":"Hebrew Academy RASG","state":"FL","region":"Miami Beach & Downtown","city":"Miami Beach","address":"2400 Pine Tree Dr","zip":"33140","lat":25.8006728,"lon":-80.1304639,"classes":[{"program":"Games","course":"Grades K-5 - Logic & Reasoning","instructor":"","status":"open","time":"Tue 4:00PM-5:00PM","startDate":"Sep 8"},{"program":"Pottery","course":"Core","instructor":"","status":"open","time":"Mon 4:00PM-5:00PM","startDate":"Oct 12"},{"program":"Wacky Science","course":"Course","instructor":"","status":"open","time":"Wed 4:00PM-5:00PM","startDate":"Sep 9"}]},{"id":10,"name":"Brauser Maimonides","state":"FL","region":"South Broward","city":"Fort Lauderdale","address":"5300 SW 40th Ave,","zip":"33314","lat":26.1089085,"lon":-80.2013509,"classes":[{"program":"Robotics with Ozobot","course":"Course","instructor":"Martin Lanz***","status":"filled","time":"Thu 3:45PM-4:30PM","startDate":"Aug 27"},{"program":"Claymation","course":"Course","instructor":"Artur Bejkollari","status":"filled","time":"Wed 3:45PM-4:30PM","startDate":"Aug 26"},{"program":"Wacky Science","course":"Course","instructor":"Martin Lanz***","status":"filled","time":"Tue 3:45PM-4:30PM","startDate":"Aug 25"},{"program":"Little Detectives","course":"Course","instructor":"Artur Bejkollari","status":"filled","time":"Mon 3:45PM-4:30PM","startDate":"Aug 24"}]},{"id":11,"name":"Carrollton School of the Sacred Heart","state":"FL","region":"South Miami","city":"Miami","address":"3747 Main Highway","zip":"33133","lat":25.7207965,"lon":-80.2476476,"classes":[{"program":"Chess","course":"Course","instructor":"Georges Saba","status":"filled","time":"Tue 3:00PM-4:00PM","startDate":"Sep 8"}]},{"id":12,"name":"EA Prep | On Hold","state":"TX","region":"Austin","city":"Austin","address":"5800 E Martin Luther King Jr Blvd","zip":"78721","lat":30.286376,"lon":-97.667325,"classes":[{"program":"Multiple Programs","course":"","instructor":"","status":"open","time":"Tue 4:00PM-5:00PM","startDate":"Sep 8"}]},{"id":13,"name":"FBISD- Pecan Grove Elementary","state":"TX","region":"Sugar Land","city":"Richmond","address":"3330 Old S Dr","zip":"77406","lat":29.639079,"lon":-95.7387189,"classes":[{"program":"3D Printing","course":"Start+","instructor":"Zoha Wamiq","status":"filled","time":"Wed 3:45PM-4:45PM","startDate":"Sep 23"}]},{"id":14,"name":"FBISD-Highlands Elementary School","state":"TX","region":"Sugarland","city":"Sugar Land","address":"2022 Colonist Park Drive","zip":"77478","lat":29.5975709,"lon":-95.6029211,"classes":[{"program":"3D Printing","course":"Start+","instructor":"","status":"open","time":"Thu 3:45PM-4:45PM","startDate":"Oct 1"},{"program":"Little Detectives","course":"Course","instructor":"","status":"open","time":"Wed 3:45PM-4:45PM","startDate":"Sep 23"}]},{"id":15,"name":"FBISD- Carolyn and Vernon Madden Elementary School","state":"TX","region":"FBISD","city":"Richmond","address":"17727 Abermore Lane","zip":"77407","lat":29.6548508,"lon":-95.6957212,"classes":[{"program":"Pottery","course":"Passport","instructor":"","status":"open","time":"Mon 3:45PM-4:45PM","startDate":"Sep 21"}]},{"id":16,"name":"FBISD - Malala Yousafzai Elementary","state":"TX","region":"Fort Bend County","city":"Richmond","address":"11770 W Aliana Trace Dr.","zip":"77407","lat":29.6416713,"lon":-95.704613,"classes":[{"program":"Little Detectives","course":"Course","instructor":"Zoha Wamiq","status":"filled","time":"Thu 3:45PM-4:45PM","startDate":"Oct 1"}]},{"id":17,"name":"FBISD - Sonal Bhuchar Elementary","state":"TX","region":"Fort Bend County","city":"Missouri City","address":"5503 Thompson Ferry Rd.","zip":"77459","lat":29.5450454,"lon":-95.5624341,"classes":[{"program":"Pottery","course":"Passport","instructor":"","status":"open","time":"Thu 3:45PM-4:45PM","startDate":"Oct 1"},{"program":"3D Printing","course":"Start+","instructor":"","status":"open","time":"Tue 3:45PM-4:45PM","startDate":"Sep 22"}]},{"id":18,"name":"FBISD - Settlers Way Elementary","state":"TX","region":"Fort Bend County","city":"Sugar Land","address":"3015 SETTLERS WAY DR","zip":"77479","lat":29.5748808,"lon":-95.6196376,"classes":[{"program":"Pottery","course":"Passport","instructor":"Nicole Abner","status":"filled","time":"Wed 3:45PM-4:45PM","startDate":"Sep 23"}]},{"id":19,"name":"FBISD - Lakeview Elementary","state":"TX","region":"Fort Bend County","city":"Sugar Land","address":"314 Lakeview Dr.","zip":"77498","lat":29.6243486,"lon":-95.62978,"classes":[{"program":"3D Printing","course":"Start+","instructor":"Oghosaikhin ( Debbie) Nehikhuere","status":"filled","time":"Wed 3:45PM-4:45PM","startDate":"Sep 23"}]},{"id":20,"name":"FBISD - Oakland Elementary","state":"TX","region":"Fort Bend County","city":"Richmond","address":"4455 Waterside Estates Dr.","zip":"77406","lat":29.6553568,"lon":-95.7365823,"classes":[{"program":"Little Detectives","course":"Course","instructor":"","status":"open","time":"Tue 3:45PM-4:45PM","startDate":"Sep 22"},{"program":"3D Printing","course":"Start+","instructor":"Zoha Wamiq","status":"filled","time":"Mon 3:45PM-4:45PM","startDate":"Sep 21"}]},{"id":21,"name":"FBISD - Walker Station Elementary","state":"TX","region":"Fort Bend County","city":"Sugar Land","address":"6200 Homeward Way","zip":"77479","lat":29.600116,"lon":-95.6673154,"classes":[{"program":"Pottery","course":"Passport","instructor":"","status":"open","time":"Mon 3:45PM-4:45PM","startDate":"Sep 21"},{"program":"Little Detectives","course":"Course","instructor":"","status":"open","time":"Mon 3:45PM-4:45PM","startDate":"Sep 21"}]},{"id":22,"name":"FBISD - James C. Neill Elementary","state":"TX","region":"Fort Bend County","city":"Richmond","address":"3830 Harvest Corner Drive","zip":"77407","lat":29.6498011,"lon":-95.7213574,"classes":[{"program":"3D Printing","course":"Start+","instructor":"Zoha Wamiq","status":"filled","time":"Tue 3:45PM-4:45PM","startDate":"Sep 22"}]},{"id":23,"name":"Pine Crest - Fort Lauderdale","state":"FL","region":"North Broward","city":"Fort Lauderdale","address":"1501 NE 62nd St","zip":"33334","lat":26.2049335,"lon":-80.1271396,"classes":[{"program":"Young Architects & Builders","course":"Course","instructor":"Kimberly Larkins***","status":"filled","time":"Wed 4:00PM-5:00PM","startDate":"Aug 26"},{"program":"Little Detectives","course":"Course","instructor":"Kimberly Larkins***","status":"filled","time":"Wed 3:00PM-4:00PM","startDate":"Aug 26"},{"program":"Space Explorers","course":"Course","instructor":"Prachi Gupta","status":"filled","time":"Mon 4:00PM-5:00PM","startDate":"Aug 31"},{"program":"Wild Side","course":"Course","instructor":"Prachi Gupta","status":"filled","time":"Mon 3:00PM-4:00PM","startDate":"Aug 31"}]},{"id":24,"name":"Pine Crest - Boca Raton","state":"FL","region":"West Palm Beach","city":"Boca Raton","address":"2700 St Andrews Blvd","zip":"33434","lat":26.374278,"lon":-80.1351033,"classes":[{"program":"Pottery","course":"Core","instructor":"Lisa Lohman***","status":"filled","time":"Thu 3:00PM-4:00PM","startDate":"Aug 27"},{"program":"Space Explorers","course":"Course","instructor":"Lisa Lohman***","status":"filled","time":"Mon 4:00PM-5:00PM","startDate":"Aug 31"},{"program":"Little Detectives","course":"Course","instructor":"Lisa Lohman***","status":"filled","time":"Mon 3:00PM-4:00PM","startDate":"Aug 31"}]},{"id":25,"name":"Christ Church Episcopal School","state":"SC","region":"Greenville","city":"Greenville","address":"245 Cavalier Drive","zip":"29607","lat":34.7963645,"lon":-82.3504177,"classes":[{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"","status":"open","time":"Thu 3:00PM-4:00PM","startDate":"Sep 10"},{"program":"Claymation","course":"Course","instructor":"","status":"open","time":"Wed 3:00PM-4:00PM","startDate":"Sep 9"}]},{"id":26,"name":"Miami Jewish Academy","state":"FL","region":"North Miami","city":"Aventura","address":"20400 NE 30th Ave","zip":"33180","lat":25.9647209,"lon":-80.1420004,"classes":[{"program":"Multiple Programs","course":"","instructor":"Sivan Saar","status":"filled","time":"Fri 10:00AM-10:45AM","startDate":"Aug 21"},{"program":"Multiple Programs","course":"","instructor":"Sivan Saar","status":"filled","time":"Thu 12:30PM-1:15PM","startDate":"Aug 20"},{"program":"Multiple Programs","course":"","instructor":"Sivan Saar","status":"filled","time":"Wed 10:00AM-10:45AM","startDate":"Aug 19"},{"program":"Multiple Programs","course":"","instructor":"Sivan Saar","status":"filled","time":"Tue 10:00AM-10:45AM","startDate":"Aug 18"},{"program":"Multiple Programs","course":"","instructor":"Sivan Saar","status":"filled","time":"Mon 10:00AM-10:45AM","startDate":"Aug 17"}]},{"id":27,"name":"Lehrman Community Day School","state":"FL","region":"Miami Beach & Downtown","city":"Miami","address":"727 Lehrman Drive / 77th Street","zip":"33141","lat":25.8571363,"lon":-80.132867,"classes":[{"program":"Woodcraft","course":"Course","instructor":"Gabriela Rosenthal","status":"filled","time":"Wed 3:40PM-4:25PM","startDate":"Aug 19"},{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"Gabriela Rosenthal","status":"filled","time":"Wed 3:00PM-3:40PM","startDate":"Aug 19"}]},{"id":28,"name":"Hillel NMB","state":"FL","region":"North Miami","city":"North Miami Beach","address":"19000 NE 25th Avenue","zip":"33180","lat":25.9016751,"lon":-80.150837,"classes":[{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"","status":"open","time":"Thu 4:00PM-5:00PM","startDate":"Aug 27"},{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"Myriam Pierre-Charles","status":"filled","time":"Wed 4:00PM-5:00PM","startDate":"Aug 26"},{"program":"RoboCoding","course":"Cubelets (3-5)","instructor":"","status":"open","time":"Mon 4:00PM-5:00PM","startDate":"Aug 24"},{"program":"Fashion","course":"Design A","instructor":"Victoria Gonzalez***","status":"filled","time":"Fri 2:00PM-3:00PM","startDate":"Aug 28"},{"program":"Magic","course":"Classic","instructor":"Gabriela Rosenthal","status":"filled","time":"Fri 2:00PM-3:00PM","startDate":"Aug 28"},{"program":"Finance","course":"Course","instructor":"Myriam Pierre-Charles","status":"filled","time":"Fri 2:00PM-3:00PM","startDate":"Aug 28"},{"program":"BrickLAB","course":"Magic Beans","instructor":"Beatriz Santiago","status":"filled","time":"Fri 1:45PM-2:45PM","startDate":"Aug 28"},{"program":"Zumba","course":"Kids","instructor":"Louise Ruiz","status":"filled","time":"Fri 1:45PM-2:45PM","startDate":"Aug 28"},{"program":"Speech & Debate","course":"Course","instructor":"Laurea Rambeau***","status":"filled","time":"Thu 4:00PM-5:00PM","startDate":"Aug 27"},{"program":"3D Printing","course":"Start+","instructor":"Shelli Betzalel","status":"filled","time":"Thu 4:00PM-5:00PM","startDate":"Aug 27"},{"program":"Makers Club","course":"Course","instructor":"Monica Menasse","status":"filled","time":"Wed 4:00PM-5:00PM","startDate":"Aug 26"},{"program":"Zumba","course":"Kids","instructor":"Louise Ruiz","status":"filled","time":"Wed 4:00PM-5:00PM","startDate":"Aug 26"},{"program":"Fashion","course":"Jewelry","instructor":"Abigail Treasure***","status":"filled","time":"Tue 4:00PM-5:00PM","startDate":"Aug 25"},{"program":"Little Doctors","course":"Course","instructor":"Gabriela Rosenthal","status":"filled","time":"Tue 4:00PM-5:00PM","startDate":"Aug 25"},{"program":"Wacky Science","course":"Course","instructor":"Abigail Treasure***","status":"filled","time":"Tue 4:00PM-5:00PM","startDate":"Aug 25"},{"program":"Art Rods","course":"Creations","instructor":"Michelle Saporiti","status":"filled","time":"Tue 4:00PM-5:00PM","startDate":"Aug 25"},{"program":"Gardening","course":"Sunshine & Soil","instructor":"Victoria Gonzalez***","status":"filled","time":"Mon 4:00PM-5:00PM","startDate":"Aug 24"}]},{"id":29,"name":"Beachside Montessori 21st CCLC","state":"FL","region":"South Broward","city":"Hollywood","address":"2230 Lincoln St","zip":"33020","lat":26.0168116,"lon":-80.152268,"classes":[{"program":"Robotics with Ozobot","course":"Course","instructor":"","status":"open","time":"Wed 3:45PM-4:45PM","startDate":"Sep 2"},{"program":"Zumba","course":"Kids","instructor":"Anita Macbeth","status":"filled","time":"Tue 3:45PM-4:45PM","startDate":"Sep 8"}]},{"id":30,"name":"Pinewood Christian Academy","state":"FL","region":"Jacksonville","city":"Middleburg","address":"198 Knight Boxx Rd","zip":"32068","lat":30.092282,"lon":-81.8355727,"classes":[{"program":"Nature Watch","course":"Course 1 - Wild Wonders","instructor":"","status":"open","time":"Wed 12:30PM-1:30PM","startDate":"May 5"},{"program":"Art Rods","course":"Creations","instructor":"","status":"open","time":"Wed 12:30PM-1:30PM","startDate":"Apr 7"},{"program":"Little Engineers","course":"First Automobile Engineer","instructor":"","status":"open","time":"Wed 12:30PM-1:30PM","startDate":"Feb 3"},{"program":"Visual Arts","course":"Art Around The World","instructor":"","status":"open","time":"Wed 12:30PM-1:30PM","startDate":"Jan 6"},{"program":"3DuxDesign","course":"Course","instructor":"","status":"open","time":"Wed 12:30PM-1:30PM","startDate":"Oct 28"},{"program":"Wild Side","course":"Course","instructor":"","status":"open","time":"Wed 12:30PM-1:30PM","startDate":"Sep 30"},{"program":"Flight & Aerodynamics","course":"Little Pilots","instructor":"","status":"open","time":"Wed 12:30PM-1:30PM","startDate":"Sep 2"}]},{"id":31,"name":"St. Andrew's School","state":"GA","region":"Chatham County","city":"Savannah","address":"601 Penn Waller Road","zip":"31410","lat":32.0111166,"lon":-80.975267,"classes":[{"program":"Origami","course":"Little Paper Pioneers","instructor":"","status":"open","time":"Fri 3:15PM-4:15PM","startDate":"Sep 11"}]},{"id":32,"name":"Orlando Torah Academy","state":"FL","region":"Orlando","city":"Orlando","address":"8651 Commodity Cir.","zip":"32819","lat":28.4564574,"lon":-81.4628223,"classes":[{"program":"Chess","course":"Course","instructor":"Theodore Slade***","status":"filled","time":"Wed 4:00PM-5:00PM","startDate":"Oct 7"},{"program":"Energize","course":"Course","instructor":"Theodore Slade***","status":"filled","time":"Wed 4:00PM-5:00PM","startDate":"Oct 7"},{"program":"Pottery","course":"Core","instructor":"","status":"open","time":"Wed 4:00PM-5:00PM","startDate":"Oct 7"},{"program":"Robotics with Ozobot","course":"Course","instructor":"","status":"open","time":"Wed 4:00PM-5:00PM","startDate":"Oct 7"},{"program":"Energize","course":"Course","instructor":"Theodore Slade***","status":"filled","time":"Mon 4:00PM-5:00PM","startDate":"Oct 12"},{"program":"Ballet","course":"Course","instructor":"","status":"open","time":"Mon 4:00PM-5:00PM","startDate":"Oct 12"},{"program":"Robotics with Ozobot","course":"Course","instructor":"","status":"open","time":"Mon 4:00PM-5:00PM","startDate":"Oct 12"}]},{"id":33,"name":"Temple Emanu-El","state":"TX","region":"Dallas County","city":"Dallas","address":"8500 Hillcrest Road","zip":"75225","lat":32.8683139,"lon":-96.7858168,"classes":[{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"Alice kelly","status":"filled","time":"Tue 3:00PM-3:45PM","startDate":"Aug 25"},{"program":"Little Engineers","course":"First Automobile Engineer","instructor":"Alice kelly","status":"filled","time":"Tue 1:00PM-1:45PM","startDate":"Aug 25"}]},{"id":34,"name":"Prime Time / ELO - Western Academy Charter","state":"FL","region":"Palm Beach","city":"Loxahatchee","address":"12031 Southern Blvd","zip":"33470","lat":26.6840141,"lon":-80.248444,"classes":[{"program":"Makers Club","course":"Course","instructor":"Vanessa taylor**","status":"filled","time":"Tue 3:30PM-4:30PM","startDate":"Aug 20"}]},{"id":35,"name":"Beth Emet School","state":"FL","region":"South Broward","city":"Cooper City","address":"4807 S Flamingo Rd","zip":"33330","lat":26.061667,"lon":-80.3136822,"classes":[{"program":"Volleyball","course":"Course","instructor":"","status":"open","time":"Fri 3:30PM-4:30PM","startDate":"Sep 4"},{"program":"Fencing","course":"Course","instructor":"","status":"open","time":"Thu 3:30PM-4:30PM","startDate":"Sep 3"},{"program":"Coding with Scratch","course":"Course","instructor":"","status":"open","time":"Thu 3:30PM-4:30PM","startDate":"Sep 3"},{"program":"3D Printing","course":"Create+","instructor":"Lucia Panton**","status":"filled","time":"Tue 3:30PM-4:30PM","startDate":"Sep 1"},{"program":"Little Detectives","course":"Course","instructor":"Lucia Panton**","status":"filled","time":"Thu 3:30PM-4:30PM","startDate":"Sep 3"},{"program":"Pottery","course":"Passport","instructor":"","status":"open","time":"Tue 3:30PM-4:30PM","startDate":"Sep 1"},{"program":"Cooking & Nutrition","course":"Course","instructor":"","status":"open","time":"Tue 3:30PM-4:30PM","startDate":"Sep 1"},{"program":"Pottery","course":"Core + Wheel","instructor":"Beatriz Santiago","status":"filled","time":"Mon 3:30PM-4:30PM","startDate":"Aug 31"},{"program":"Robotics with Ozobot","course":"Course","instructor":"Lucia Panton**","status":"filled","time":"Mon 3:30PM-4:30PM","startDate":"Aug 31"}]},{"id":36,"name":"R Club - Tyrone Middle School","state":"FL","region":"Pinellas County","city":"Saint Petersburgh","address":"2375 66th St. N","zip":"33710","lat":27.7913059,"lon":-82.7063689,"classes":[{"program":"3D Printing","course":"Create+","instructor":"Robert Williams***","status":"filled","time":"Tue 4:30PM-5:30PM","startDate":"Aug 11"}]},{"id":37,"name":"The Girls' School","state":"TX","region":"Austin","city":"Austin","address":"2007 McCall Rd","zip":"78703","lat":30.2883043,"lon":-97.7649583,"classes":[{"program":"Gardening","course":"Sunshine & Soil","instructor":"","status":"open","time":"Wed 3:00PM-4:00PM","startDate":"Aug 26"},{"program":"Magic","course":"Classic","instructor":"","status":"open","time":"Tue 3:00PM-4:00PM","startDate":"Aug 25"},{"program":"Pottery","course":"Core","instructor":"","status":"open","time":"Mon 3:00PM-4:00PM","startDate":"Aug 24"}]},{"id":38,"name":"The Lovett School","state":"GA","region":"Fulton County","city":"Atlanta","address":"4075 Paces Ferry Road, N.W.","zip":"30327","lat":33.8644963,"lon":-84.4185385,"classes":[{"program":"Robotics with Ozobot","course":"Course","instructor":"Mary Adewusi***","status":"filled","time":"Thu 3:45PM-4:45PM","startDate":"Sep 3"},{"program":"Wacky Science","course":"Little Scientists","instructor":"Mary Adewusi***","status":"filled","time":"Wed 3:45PM-4:45PM","startDate":"Sep 2"},{"program":"Strawbees","course":"Course","instructor":"Mary Adewusi***","status":"filled","time":"Tue 3:45PM-4:45PM","startDate":"Sep 1"},{"program":"Art Rods","course":"Creations","instructor":"Mary Adewusi***","status":"filled","time":"Mon 3:45PM-4:45PM","startDate":"Aug 31"}]},{"id":39,"name":"Parish Episcopal School","state":"TX","region":"Dallas","city":"Dallas","address":"14115 Hillcrest Road","zip":"75254","lat":32.9409065,"lon":-96.7875657,"classes":[{"program":"Nature Watch","course":"Course 1 - Wild Wonders","instructor":"Marla Flecker**","status":"filled","time":"Wed 3:00PM-4:00PM","startDate":"Sep 9"},{"program":"Pottery","course":"Core","instructor":"Ana Maria Gutierrez","status":"filled","time":"Tue 4:00PM-5:00PM","startDate":"Sep 8"},{"program":"Energize","course":"Course","instructor":"Ana Maria Gutierrez","status":"filled","time":"Fri 3:00PM-4:00PM","startDate":"Sep 4"},{"program":"Little Doctors","course":"Course","instructor":"Ana Maria Gutierrez","status":"filled","time":"Mon 3:00PM-4:00PM","startDate":"Aug 31"}]},{"id":40,"name":"The Compass School of Texas","state":"TX","region":"Dallas County","city":"Dallas","address":"5414 W. Northwest Highway","zip":"75220","lat":32.8650813,"lon":-96.8186836,"classes":[{"program":"Fencing","course":"Course","instructor":"David Ramirez***","status":"filled","time":"Thu 3:30PM-4:30PM","startDate":"Sep 10"},{"program":"Podcasting","course":"Course","instructor":"Antoinette Bermudes","status":"filled","time":"Thu 3:30PM-4:30PM","startDate":"Sep 10"},{"program":"Martial Arts","course":"Course","instructor":"","status":"open","time":"Thu 3:30PM-4:30PM","startDate":"Sep 10"},{"program":"Drama","course":"Improv","instructor":"Antoinette Bermudes","status":"filled","time":"Wed 3:30PM-4:30PM","startDate":"Sep 9"},{"program":"Martial Arts","course":"Course","instructor":"","status":"open","time":"Tue 3:30PM-4:30PM","startDate":"Sep 8"}]},{"id":41,"name":"City of Hialeah - Henry H. Filer Middle School","state":"FL","region":"West Miami","city":"Hialeah","address":"531 W. 29th St.","zip":"33012","lat":25.8484832,"lon":-80.2933399,"classes":[{"program":"Lego Robotics","course":"LEGO® Robotics – SPIKE™ Prime","instructor":"Beatriz Santiago","status":"filled","time":"Thu 4:20PM-5:20PM","startDate":"Oct 15"}]},{"id":42,"name":"City of Hialeah - Middle School","state":"FL","region":"West Miami","city":"Hialeah","address":"6027 E 7th Ave.","zip":"33013","lat":25.8759456,"lon":-80.2680603,"classes":[{"program":"Lego Robotics","course":"LEGO® Robotics – SPIKE™ Prime","instructor":"Beatriz Santiago","status":"filled","time":"Wed 4:00PM-5:00PM","startDate":"Oct 14"}]},{"id":43,"name":"City of Hialeah - Hialeah Educational Academy","state":"FL","region":"West Miami","city":"Hialeah","address":"2590 W 76th Street","zip":"33016","lat":25.8912758,"lon":-80.3356081,"classes":[{"program":"Lego Robotics","course":"LEGO® Robotics – SPIKE™ Prime","instructor":"Beatriz Santiago","status":"filled","time":"Tue 3:30PM-4:30PM","startDate":"Oct 13"}]},{"id":44,"name":"Greater Atlanta Christian School","state":"GA","region":"Atlanta","city":"Norcross","address":"1575 Indian Trail Lilburn Rd NW","zip":"30093","lat":33.9165154,"lon":-84.1677947,"classes":[{"program":"3D Printing","course":"Start+","instructor":"Kofi Zulu***","status":"filled","time":"Thu 3:30PM-4:30PM","startDate":"Aug 27"},{"program":"Nature Watch","course":"Course 1 - Wild Wonders","instructor":"Triston Edwards","status":"filled","time":"Tue 3:30PM-4:30PM","startDate":"Aug 25"}]},{"id":45,"name":"Grandview Preparatory School - In School Programs","state":"FL","region":"Boca Raton","city":"Boca Raton","address":"336 Spanish River Boulevard NW","zip":"33431","lat":26.3859549,"lon":-80.0888805,"classes":[{"program":"Robotics with Ozobot","course":"Course","instructor":"Shelli Betzalel","status":"filled","time":"Tue 1:45PM-2:30PM","startDate":"Aug 18"},{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"Prachi Gupta","status":"filled","time":"Fri 1:45PM-2:30PM","startDate":"Aug 21"},{"program":"Lego Robotics","course":"LEGO® Robotics – SPIKE™ Essential","instructor":"Shelli Betzalel","status":"filled","time":"Fri 1:00PM-1:45PM","startDate":"Aug 21"},{"program":"Strawbees","course":"Course","instructor":"Shelli Betzalel","status":"filled","time":"Fri 11:45AM-12:30PM","startDate":"Aug 21"},{"program":"Structural Engineering","course":"Bridges & Skyscrapers","instructor":"Shelli Betzalel","status":"filled","time":"Fri 10:30AM-11:15AM","startDate":"Aug 21"},{"program":"Structural Engineering","course":"Bridges & Skyscrapers","instructor":"Prachi Gupta","status":"filled","time":"Tue 10:30AM-11:15AM","startDate":"Aug 18"}]},{"id":46,"name":"Evelyn Rubenstein Jewish Community Center of Houston (Elementary Campus)","state":"TX","region":"Houston","city":"Houston","address":"5601 S Braeswood Blvd","zip":"77096","lat":29.6737985,"lon":-95.4845666,"classes":[{"program":"Makers Club","course":"Course","instructor":"Angel Guzman**","status":"filled","time":"Wed 4:15PM-5:15PM","startDate":"Oct 21"},{"program":"Wacky Science","course":"Course","instructor":"Angel Guzman**","status":"filled","time":"Wed 4:15PM-5:15PM","startDate":"Aug 26"},{"program":"Makers Club","course":"Course","instructor":"Angel Guzman**","status":"filled","time":"Tue 4:15PM-5:15PM","startDate":"Oct 20"},{"program":"Wacky Science","course":"Course","instructor":"Angel Guzman**","status":"filled","time":"Tue 4:15PM-5:15PM","startDate":"Aug 25"}]},{"id":47,"name":"Montessori Reggio Academy","state":"TX","region":"Fort Bend County","city":"Sugar Land","address":"16103 Lexington Blvd #100","zip":"77479","lat":29.5748808,"lon":-95.6196376,"classes":[{"program":"Choir","course":"Course","instructor":"Oghosaikhin ( Debbie) Nehikhuere","status":"filled","time":"Fri 2:00PM-3:00PM","startDate":"Aug 28"},{"program":"Pottery","course":"Core","instructor":"Zoha Wamiq","status":"filled","time":"Thu 2:00PM-3:00PM","startDate":"Aug 27"},{"program":"3D Printing","course":"Start+","instructor":"Zoha Wamiq","status":"filled","time":"Wed 2:00PM-3:00PM","startDate":"Aug 26"},{"program":"Little Detectives","course":"Course","instructor":"Zoha Wamiq","status":"filled","time":"Tue 2:00PM-3:00PM","startDate":"Aug 25"},{"program":"Little Doctors","course":"Course","instructor":"Zoha Wamiq","status":"filled","time":"Mon 2:00PM-3:00PM","startDate":"Aug 24"}]},{"id":48,"name":"North Broward Preparatory School","state":"FL","region":"North Broward","city":"Coconut Creek","address":"7600 Lyons Rd","zip":"33073","lat":26.326333,"lon":-80.1827401,"classes":[{"program":"Pottery","course":"Core","instructor":"Artur Bejkollari","status":"filled","time":"Thu 3:30PM-4:30PM","startDate":"Aug 27"},{"program":"3D Printing","course":"Start+","instructor":"Nayra Pacheco","status":"filled","time":"Wed 2:30PM-3:30PM","startDate":"Aug 26"},{"program":"Claymation","course":"Course","instructor":"Artur Bejkollari","status":"filled","time":"Tue 3:30PM-4:30PM","startDate":"Aug 25"},{"program":"Little Detectives","course":"Course","instructor":"Nayra Pacheco","status":"filled","time":"Mon 3:30PM-4:30PM","startDate":"Aug 31"}]},{"id":49,"name":"Vanguard Prep School | ESE","state":"TX","region":"Dallas County","city":"Dallas","address":"4240 Sigma Road","zip":"75244","lat":32.9365429,"lon":-96.8379412,"classes":[{"program":"Esports","course":"Game On!","instructor":"Ian Burney","status":"filled","time":"Tue 3:15PM-4:15PM","startDate":"Aug 25"},{"program":"Chess","course":"Course","instructor":"WIlliam Kocak","status":"filled","time":"Mon 3:15PM-4:15PM","startDate":"Aug 24"},{"program":"Energize","course":"Course","instructor":"Rinelle Berry***","status":"filled","time":"Thu 3:00PM-4:00PM","startDate":"Aug 27"},{"program":"Drama","course":"Essentials","instructor":"Ana Maria Gutierrez","status":"filled","time":"Wed 3:00PM-4:00PM","startDate":"Aug 26"},{"program":"Hip Hop","course":"Course","instructor":"Rinelle Berry***","status":"filled","time":"Tue 3:00PM-4:00PM","startDate":"Aug 25"}]},{"id":50,"name":"Shlenker School","state":"TX","region":"Houston","city":"Houston","address":"5600 N. Braeswood Blvd.","zip":"77096","lat":29.676097,"lon":-95.487633,"classes":[{"program":"Young Architects & Builders","course":"Course","instructor":"Angel Guzman**","status":"filled","time":"Mon 3:30PM-4:30PM","startDate":"Aug 31"},{"program":"Drawing","course":"Sketch Studio","instructor":"","status":"open","time":"Tue 3:30PM-4:30PM","startDate":"Sep 1"},{"program":"Little Doctors","course":"Course","instructor":"Oghosaikhin ( Debbie) Nehikhuere","status":"filled","time":"Tue 3:30PM-4:30PM","startDate":"Sep 1"}]},{"id":51,"name":"Mount Vernon School","state":"GA","region":"Atlanta","city":"Atlanta","address":"510 Mount Vernon Hwy NE","zip":"30328","lat":33.933233,"lon":-84.3827854,"classes":[{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"Shondricia Bulaba**","status":"filled","time":"Fri 3:00PM-3:45PM","startDate":"Sep 11"},{"program":"3D Printing","course":"Start+","instructor":"Crystal Williams","status":"filled","time":"Fri 3:00PM-3:45PM","startDate":"Sep 11"},{"program":"Build a Bot","course":"AmazBots","instructor":"Shondricia Bulaba**","status":"filled","time":"Tue 3:00PM-3:45PM","startDate":"Sep 1"},{"program":"3D Printing","course":"Start+","instructor":"Crystal Williams","status":"filled","time":"Thu 3:00PM-3:45PM","startDate":"Sep 3"},{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"Shondricia Bulaba**","status":"filled","time":"Mon 3:00PM-3:45PM","startDate":"Aug 31"}]},{"id":52,"name":"St. Agatha Catholic School","state":"FL","region":"Miami","city":"Miami","address":"1125 SW 107th Avenue","zip":"33174","lat":25.7579544,"lon":-80.3677167,"classes":[{"program":"Music","course":"Guitar","instructor":"","status":"open","time":"Fri 3:15PM-4:15PM","startDate":"Sep 4"},{"program":"3D Printing","course":"Create+","instructor":"","status":"open","time":"Thu 3:15PM-4:15PM","startDate":"Sep 3"},{"program":"Chess","course":"Course","instructor":"Georges Saba","status":"filled","time":"Wed 3:15PM-4:15PM","startDate":"Sep 2"},{"program":"Energize","course":"Course","instructor":"","status":"open","time":"Tue 3:15PM-4:15PM","startDate":"Sep 1"},{"program":"Pottery","course":"Core","instructor":"Artur Bejkollari","status":"filled","time":"Mon 3:15PM-4:15PM","startDate":"Sep 14"}]},{"id":53,"name":"Jack Segal Academy of Beth Yeshurun","state":"TX","region":"Houston","city":"Houston","address":"4525 Beechnut","zip":"77096","lat":29.6890799,"lon":-95.453581,"classes":[{"program":"3D Printing","course":"Start+","instructor":"Devonda Francis**","status":"filled","time":"Thu 3:15PM-4:15PM","startDate":"Aug 27"},{"program":"Zumba","course":"Kids","instructor":"Devonda Francis**","status":"filled","time":"Wed 2:00PM-3:00PM","startDate":"Aug 26"},{"program":"Little Doctors","course":"Course","instructor":"Nicole Abner","status":"filled","time":"Tue 3:15PM-4:15PM","startDate":"Aug 25"},{"program":"Magic","course":"Explorers","instructor":"Nicole Abner","status":"filled","time":"Tue 2:00PM-3:00PM","startDate":"Aug 25"}]},{"id":54,"name":"Pinnacle Montessori of Melissa","state":"TX","region":"Collin County","city":"Melissa","address":"2233 Sam Rayburn Hwy","zip":"75454","lat":33.2771965,"lon":-96.5717223,"classes":[{"program":"Wacky Science","course":"Course","instructor":"","status":"open","time":"Fri 3:30PM-4:30PM","startDate":"Sep 18"},{"program":"Strawbees","course":"Course","instructor":"","status":"open","time":"Thu 3:45PM-4:45PM","startDate":"Sep 17"},{"program":"3D Printing","course":"Start+","instructor":"","status":"open","time":"Wed 4:30PM-5:30PM","startDate":"Sep 16"},{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"","status":"open","time":"Mon 3:45PM-4:45PM","startDate":"Sep 14"}]},{"id":55,"name":"Grandview Preparatory School - After School Programs","state":"FL","region":"Boca Raton","city":"Boca Raton","address":"336 Spanish River Boulevard NW","zip":"33431","lat":26.3859549,"lon":-80.0888805,"classes":[{"program":"3D Printing","course":"Start+","instructor":"Shelli Betzalel","status":"filled","time":"Tue 3:00PM-4:00PM","startDate":"Aug 18"},{"program":"Makers Club","course":"Course","instructor":"Prachi Gupta","status":"filled","time":"Fri 3:00PM-4:00PM","startDate":"Aug 28"}]},{"id":56,"name":"Robert M. Beren Academy","state":"TX","region":"Harris County","city":"Houston","address":"11333 Cliffwood Drive","zip":"77035","lat":29.6534893,"lon":-95.453226,"classes":[{"program":"Energize","course":"Course","instructor":"Angel Guzman**","status":"filled","time":"Thu 4:15PM-5:15PM","startDate":"Aug 27"},{"program":"Basketball","course":"Course","instructor":"","status":"open","time":"Wed 4:15PM-5:15PM","startDate":"Aug 26"},{"program":"Zumba","course":"Kids","instructor":"Devonda Francis**","status":"filled","time":"Tue 4:15PM-5:15PM","startDate":"Aug 25"}]},{"id":57,"name":"Prime Time / ELO - Adopt A Family of Palm Beaches, Inc.","state":"FL","region":"West Palm Beach","city":"Lake Worth","address":"1712 2nd Ave. North","zip":"33460","lat":26.6181756,"lon":-80.0654446,"classes":[{"program":"Wacky Science","course":"Course","instructor":"Anaruth Pamela Marroquin","status":"filled","time":"Thu 3:00PM-4:00PM","startDate":"Jun 5"}]},{"id":58,"name":"Prime Time / ELO - Del Prado Elementary School","state":"FL","region":"West Palm Beach","city":"Boca Raton","address":"7900 Del Prado N","zip":"33433","lat":26.3543291,"lon":-80.1665187,"classes":[{"program":"Wacky Science","course":"Course","instructor":"Nasomie James","status":"filled","time":"Tue 3:00PM-4:00PM","startDate":"Aug 18"}]},{"id":59,"name":"BIA Charter School (Brookhaven Innovation Academy Charter School)","state":"GA","region":"Atlanta","city":"Norcross","address":"186 Hunter St NW,","zip":"30071","lat":33.939773,"lon":-84.2231084,"classes":[{"program":"Basketball","course":"Course","instructor":"Don Tillman","status":"filled","time":"Fri 3:30PM-4:30PM","startDate":"Aug 21"},{"program":"RoboCoding","course":"Cubelets (3-5)","instructor":"Kofi Zulu***","status":"filled","time":"Fri 3:30PM-4:30PM","startDate":"Aug 21"},{"program":"Basketball","course":"Course","instructor":"Don Tillman","status":"filled","time":"Thu 3:30PM-4:30PM","startDate":"Aug 20"},{"program":"Little Doctors","course":"Course","instructor":"Triston Edwards","status":"filled","time":"Wed 3:30PM-4:30PM","startDate":"Aug 19"},{"program":"Pottery","course":"Core + Painting","instructor":"Crystal Williams","status":"filled","time":"Tue 3:30PM-4:30PM","startDate":"Aug 18"}]},{"id":60,"name":"Trinity Preparatory School","state":"FL","region":"Orlando","city":"Winter Park","address":"5700 Trinity Prep Lane,","zip":"32792","lat":28.6115841,"lon":-81.2726907,"classes":[{"program":"Business","course":"Young Sharks","instructor":"","status":"open","time":"Fri 3:30PM-4:30PM","startDate":"Sep 4"},{"program":"Cooking & Nutrition","course":"Course","instructor":"","status":"open","time":"Thu 3:30PM-4:30PM","startDate":"Sep 3"},{"program":"Podcasting","course":"Course","instructor":"","status":"open","time":"Wed 3:30PM-4:30PM","startDate":"Sep 2"},{"program":"Web Design","course":"Course","instructor":"Janal Johnson","status":"filled","time":"Tue 3:30PM-4:30PM","startDate":"Sep 1"},{"program":"3D Printing","course":"Create+","instructor":"","status":"open","time":"Mon 3:30PM-4:30PM","startDate":"Aug 31"}]},{"id":61,"name":"Eaton Academy","state":"GA","region":"Atlanta","city":"Roswell","address":"1000 Old Roswell Lakes Pkwy","zip":"30076","lat":34.0342393,"lon":-84.3370035,"classes":[{"program":"Chess","course":"Course","instructor":"","status":"open","time":"Thu 3:00PM-4:00PM","startDate":"Sep 3"},{"program":"3D Printing","course":"Create+","instructor":"Crystal Williams","status":"filled","time":"Wed 3:00PM-4:00PM","startDate":"Sep 2"},{"program":"Pottery","course":"Core","instructor":"Crystal Williams","status":"filled","time":"Mon 3:00PM-4:00PM","startDate":"Aug 31"}]},{"id":62,"name":"Holy Trinity Catholic School","state":"SC","region":"Horry County","city":"North Myrtle Beach","address":"1100 8th Avenue N","zip":"29582","lat":33.8340814,"lon":-78.6700177,"classes":[{"program":"3D Printing","course":"Start+","instructor":"","status":"open","time":"Thu 3:00PM-4:00PM","startDate":"Feb 18"},{"program":"Nature Watch","course":"Course 1 - Wild Wonders","instructor":"","status":"open","time":"Mon 3:00PM-4:00PM","startDate":"Mar 1"},{"program":"Drawing","course":"Sketch Studio","instructor":"","status":"open","time":"Thu 3:00PM-4:00PM","startDate":"Jan 7"},{"program":"Ballet","course":"Course","instructor":"","status":"open","time":"Mon 3:00PM-4:00PM","startDate":"Jan 4"},{"program":"Magic","course":"Explorers","instructor":"","status":"open","time":"Thu 3:00PM-4:00PM","startDate":"Oct 15"},{"program":"Gymnastics","course":"Course","instructor":"","status":"open","time":"Mon 3:00PM-4:00PM","startDate":"Oct 12"},{"program":"RoboCoding","course":"Intro to Cubelets (PreK-2)","instructor":"","status":"open","time":"Thu 3:00PM-4:00PM","startDate":"Aug 27"},{"program":"Lego Robotics","course":"LEGO® Robotics – SPIKE™ Essential","instructor":"","status":"open","time":"Thu 3:00PM-4:00PM","startDate":"Aug 27"},{"program":"Martial Arts","course":"Course","instructor":"","status":"open","time":"Mon 3:00PM-4:00PM","startDate":"Aug 24"}]},{"id":63,"name":"White Rock Montessori","state":"TX","region":"Dallas","city":"Dallas","address":"1601 Oates Dr.","zip":"75228","lat":32.822382,"lon":-96.6872513,"classes":[{"program":"Aviation","course":"Pitsco","instructor":"Alice kelly","status":"filled","time":"Wed 3:20PM-4:20PM","startDate":"Aug 26"},{"program":"Visual Arts","course":"Famous Artist","instructor":"Ana Maria Gutierrez","status":"filled","time":"Thu 3:20PM-4:20PM","startDate":"Aug 27"},{"program":"Dough","course":"Little Dough-nuts","instructor":"Alice kelly","status":"filled","time":"Fri 3:20PM-4:20PM","startDate":"Aug 28"}]}];
+
+const INSTRUCTORS = [{"name":"Aaron Marshall**","state":"TX","region":"Houston","zip":"77082","lat":29.7228957,"lon":-95.610372},{"name":"Abigail Treasure***","state":"FL","region":"North Miami Beach","zip":"33179","lat":25.9593907,"lon":-80.1788104},{"name":"Alegina Lora***","state":"GA","region":"Atlanta","zip":"30096","lat":33.9749399,"lon":-84.1424235},{"name":"Alexandra Sosa Tomasi","state":"FL","region":"South Broward","zip":"33441","lat":26.3102838,"lon":-80.101681},{"name":"Alexis Johnson","state":"TX","region":"Fort Bend","zip":"77459","lat":29.529209,"lon":-95.5420254},{"name":"Alexis Swanson***","state":"FL","region":"West Palm Beach","zip":"33415-1535","lat":26.6601396,"lon":-80.1300298},{"name":"Alexus McLamore**","state":"SC","region":"Columbia/South Carolina","zip":"29223-8252","lat":34.093861,"lon":-80.9260891},{"name":"Alice kelly","state":"TX","region":"Dallas County","zip":"75023-4315","lat":32.916900575,"lon":-96.84236342499999},{"name":"Alicia Goodwin**","state":"SC","region":"Columbia","zip":"29052","lat":33.8454259,"lon":-80.7448675},{"name":"Alisha Davis","state":"GA","region":"Savannah","zip":"31322","lat":32.1126285,"lon":-81.3121622},{"name":"Allicia Nickerson Chambers","state":"TX","region":"Dallas County","zip":"75215","lat":32.761026,"lon":-96.7722014},{"name":"Allison Myers**","state":"SC","region":"Columbia/South Carolina","zip":"29160","lat":33.7443686,"lon":-81.0567846},{"name":"Alva Clemons**","state":"FL","region":"Pinellas County","zip":"34205","lat":27.4832534,"lon":-82.5826577},{"name":"Amar Picazo***","state":"TX","region":"Austin","zip":"78665-5002","lat":30.5559832,"lon":-97.6585202},{"name":"Ami Shah**","state":"TX","region":"Dallas","zip":"75039","lat":32.8910951,"lon":-96.8421051},{"name":"Amne Jones","state":"GA","region":"Atlanta","zip":"30214-8100","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Ana Maria Gutierrez","state":"TX","region":"Dallas","zip":"75126","lat":32.7556138,"lon":-96.4381321},{"name":"Anamika Gupta*","state":"TX","region":"Dallas","zip":"75036","lat":33.141963,"lon":-96.8928516},{"name":"Anaruth Pamela Marroquin","state":"FL","region":"Lakeworth","zip":"33463-7420","lat":26.6127201,"lon":-80.1250168},{"name":"Andreina Obelmejia","state":"FL","region":"west broward","zip":"33327","lat":26.1191897,"lon":-80.4124129},{"name":"Andryel Hicks Walker","state":"SC","region":"Columbia/South Carolina","zip":"29212","lat":34.0760536,"lon":-81.180851},{"name":"Angel Guzman**","state":"TX","region":"Houston","zip":"77016-2241","lat":29.815847015789473,"lon":-95.57579817894737},{"name":"Angela Holden**","state":"TX","region":"Dallas","zip":"75019","lat":32.9770252,"lon":-96.9906761},{"name":"Angela Jones**","state":"FL","region":"Orlando","zip":"32829-8131","lat":28.459454980952376,"lon":-81.31524086666666},{"name":"Angelina Santiesteban","state":"FL","region":"Orlando","zip":"32730","lat":28.6524269,"lon":-81.3419438},{"name":"Angelo Bolanos","state":"FL","region":"Broward - South","zip":"33024-3037","lat":26.0087652,"lon":-80.26326710000001},{"name":"Anita Macbeth","state":"FL","region":"South Broward","zip":"33092","lat":26.0673698,"lon":-80.2085521},{"name":"Anna Smith","state":"GA","region":"Atlanta","zip":"30135","lat":33.6964751,"lon":-84.7411994},{"name":"Antoinette Bermudes","state":"TX","region":"Dallas","zip":"75087-2236","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Anyia Nesbeth**","state":"FL","region":"South Broward","zip":"33321","lat":26.1978043,"lon":-80.2612041},{"name":"Apollonia Fudge-Guerra","state":"FL","region":"Orlando","zip":"34741","lat":28.3067412,"lon":-81.4224831},{"name":"Araceli Taranto **","state":"TX","region":"Dallas County","zip":"75104","lat":32.5960542,"lon":-96.9455453},{"name":"Ariel Fields","state":"FL","region":"Tampa","zip":"33609-1750","lat":27.978479513333337,"lon":-82.57419381999999},{"name":"Artur Bejkollari","state":"FL","region":"Miami","zip":"33131-2935","lat":25.81435772857143,"lon":-80.23417071428571},{"name":"Ashley Putnam***","state":"GA","region":"Macon","zip":"31061","lat":33.0883389,"lon":-83.2438507},{"name":"Ashley Warner","state":"FL","region":"Pinellas County","zip":"33713","lat":27.7849965,"lon":-82.6742924},{"name":"Aswini Kumaravel","state":"GA","region":"Atlanta","zip":"30041","lat":34.1850334,"lon":-84.106798},{"name":"Athena Atkinson","state":"FL","region":"South Miami","zip":"33133-4824","lat":25.681355771428567,"lon":-80.31700777142858},{"name":"Beatriz Santiago","state":"FL","region":"North Miami","zip":"33178","lat":25.8326278,"lon":-80.3701578},{"name":"Bela Fritz","state":"TX","region":"Austin","zip":"78749-3202","lat":30.3633419625,"lon":-97.7467074},{"name":"Belva English","state":"SC","region":"Columbia","zip":"29115-3283","lat":33.4923487,"lon":-80.8606418},{"name":"Benisa Forte**","state":"FL","region":"West Palm Beach","zip":"33484","lat":26.4523848,"lon":-80.131195},{"name":"Benita McGhee***","state":"TX","region":"Houston","zip":"77379","lat":30.0447675,"lon":-95.5241863},{"name":"Beth Pennington","state":"FL","region":"Broward","zip":"3301","lat":26.074224137499996,"lon":-80.28854276249999},{"name":"Blaire Hohenshelt","state":"TX","region":"Dallas","zip":"75225-6202","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Brennan Jones**","state":"TX","region":"Dallas County","zip":"75048","lat":32.9646387,"lon":-96.5869009},{"name":"Briana Perdomo***","state":"FL","region":"Plantation","zip":"33027-4817","lat":26.074224137499996,"lon":-80.28854276249999},{"name":"Bridget Gearty**","state":"GA","region":"Chatham County","zip":"31401","lat":32.0717994,"lon":-81.0948495},{"name":"Brody Lane**","state":"TX","region":"College Station","zip":"77840","lat":30.6196666,"lon":-96.3436985},{"name":"Caitlynn De Los Santos","state":"FL","region":"West Palm Beach","zip":"33426","lat":26.5367721,"lon":-80.0844516},{"name":"Calandra Gantt","state":"GA","region":"Atlanta","zip":"30331-2423","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Camilo Caceres**","state":"FL","region":"Miramar","zip":"33023","lat":25.99053,"lon":-80.20859},{"name":"Camron Wallace*","state":"FL","region":"West Palm Beach","zip":"33407-1314","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Carla Mattia*","state":"FL","region":"West Palm Beach","zip":"33445","lat":26.4557508,"lon":-80.1099041},{"name":"Carlyle Nelson**","state":"FL","region":"Pahokee","zip":"33476-1614","lat":26.7636461,"lon":-80.52696216666666},{"name":"Carrie A Worley","state":"TX","region":"Dallas","zip":"76051-1975","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Cheryl Register","state":"GA","region":"Lowndes County","zip":"31649-1631","lat":31.0205864,"lon":-83.27477604999999},{"name":"Chessa Reid***","state":"FL","region":"Miami","zip":"33035-1120","lat":25.81435772857143,"lon":-80.23417071428571},{"name":"Christian Andrada","state":"TX","region":"San Antonio","zip":"78216-7633","lat":29.509902666666665,"lon":-98.540575},{"name":"Christina Blovad","state":"FL","region":"West Palm Beach","zip":"33467-7805","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Christina Couchman DeAngelis","state":"GA","region":"Lowndes County","zip":"31602-4982","lat":31.0205864,"lon":-83.27477604999999},{"name":"Christine Eliason","state":"SC","region":"Columbia/South Carolina","zip":"29461-8521","lat":33.1685291,"lon":-80.0288816},{"name":"Christine fischer","state":"FL","region":"Palm Beach county","zip":"34994-4548","lat":26.80432392,"lon":-80.36929046},{"name":"Christine Harrelson*","state":"FL","region":"Tampa","zip":"33707-2622","lat":27.978479513333337,"lon":-82.57419381999999},{"name":"Cinthia Herrera***","state":"TX","region":"Austin","zip":"78703","lat":30.2884386,"lon":-97.7650374},{"name":"Constance McKnight","state":"GA","region":"Atlanta","zip":"30014-3845","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Courtney Ross","state":"FL","region":"Tampa","zip":"33705-4933","lat":27.978479513333337,"lon":-82.57419381999999},{"name":"Cristina Ganz*","state":"FL","region":"West palm beach","zip":"33445-1975","lat":26.4557508,"lon":-80.1099041},{"name":"Cristine Kreplick","state":"FL","region":"Pinellas County","zip":"34684-3719","lat":28.0765651,"lon":-82.7283795},{"name":"Crystal Watson***","state":"FL","region":"West Palm Beach","zip":"33409","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Crystal Williams","state":"GA","region":"Atlanta","zip":"30314","lat":33.7575652,"lon":-84.4306975},{"name":"Cydney Hanks","state":"TX","region":"Fort Bend","zip":"77077-3487","lat":29.658152166666667,"lon":-95.66757493333334},{"name":"Cynthia Calzada","state":"TX","region":"San Antonio","zip":"78254","lat":29.5282355,"lon":-98.6953325},{"name":"Dally Douglas","state":"SC","region":"Horry County","zip":"29566","lat":33.8732219,"lon":-78.6462888},{"name":"Damani Obie*","state":"FL","region":"West Palm Beach","zip":"33407","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Dana' Washington","state":"TX","region":"Austin","zip":"78641-5360","lat":30.3633419625,"lon":-97.7467074},{"name":"Danica Creaghan","state":"TX","region":"Dallas","zip":"75208","lat":32.7548999,"lon":-96.8390403},{"name":"Danica Wuchenich***","state":"FL","region":"Boca Raton","zip":"33436","lat":26.143525750000002,"lon":-80.20289435000001},{"name":"Daniel Vidaurri***","state":"TX","region":"Austin","zip":"78758","lat":30.3816151,"lon":-97.7080862},{"name":"Danielle Macias sosa*","state":"FL","region":"West Palm Beach","zip":"33441","lat":26.3102838,"lon":-80.101681},{"name":"David Ramirez***","state":"TX","region":"Dallas County","zip":"75019","lat":32.9770252,"lon":-96.9906761},{"name":"Dawn Henderson","state":"GA","region":"Atlanta","zip":"30127","lat":33.8601285,"lon":-84.7082083},{"name":"Deanna Radford","state":"GA","region":"Atlanta","zip":"30345","lat":33.8466069,"lon":-84.2876339},{"name":"Deepti Kapur","state":"GA","region":"Atlanta","zip":"30080","lat":33.8785822,"lon":-84.5052113},{"name":"Deidre Dixon**","state":"FL","region":"Hialeah","zip":"33015-6328","lat":25.942404,"lon":-80.3192444},{"name":"Delroy Burke","state":"GA","region":"Savannah","zip":"31407","lat":32.1858419,"lon":-81.2364464},{"name":"Derrick Bonner ***","state":"GA","region":"Atlanta","zip":"30331","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Devan Hairpersaud","state":"FL","region":"Pompano Beach","zip":"33321","lat":26.1978043,"lon":-80.2612041},{"name":"Devonda Francis**","state":"TX","region":"Houston","zip":"77088-2149","lat":29.815847015789473,"lon":-95.57579817894737},{"name":"Dewayne Tolbert*","state":"FL","region":"Palm Beach county","zip":"33476","lat":26.7636461,"lon":-80.52696216666666},{"name":"Diana Becerra","state":"TX","region":"Dallas","zip":"75211","lat":32.7423578,"lon":-96.88285},{"name":"Diana Lopez","state":"TX","region":"San Antonio","zip":"78228","lat":29.4600306,"lon":-98.5688175},{"name":"Diana Myers***","state":"SC","region":"Myrtle Beach","zip":"29588","lat":33.6397442,"lon":-79.0160408},{"name":"Dimitri (Alex) Love","state":"TX","region":"Dallas","zip":"76227-5421","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Dina Al-Hassani","state":"FL","region":"West Palm Beach","zip":"33063","lat":26.2506954,"lon":-80.2070051},{"name":"Don Tillman","state":"GA","region":"Atlanta","zip":"30341","lat":33.8915473,"lon":-84.2909614},{"name":"Donald Riddle **","state":"TX","region":"Collin County","zip":"75023","lat":32.916900575,"lon":-96.84236342499999},{"name":"Donna Garcia","state":"TX","region":"Dallas County","zip":"75234-2122","lat":32.916900575,"lon":-96.84236342499999},{"name":"Donna Suss**","state":"GA","region":"Chatham County","zip":"31410","lat":32.0200084,"lon":-80.9819553},{"name":"Donyale Greenwell","state":"GA","region":"Atlanta","zip":"30141-4256","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Earnesha Whitmore***","state":"GA","region":"Atlanta","zip":"30044-6413","lat":33.92465,"lon":-84.06549},{"name":"Edward Gelwasser","state":"FL","region":"Broward","zip":"33021-8445","lat":26.074224137499996,"lon":-80.28854276249999},{"name":"Eesha Gupta*","state":"TX","region":"Houston","zip":"77449","lat":29.818002,"lon":-95.7397415},{"name":"Elizabeth Rodriguez**","state":"TX","region":"San Antonio","zip":"78210","lat":29.3979077,"lon":-98.4750819},{"name":"Elizabeth Sapre***","state":"TX","region":"Houston","zip":"77355","lat":30.1517317,"lon":-95.740473},{"name":"Elnora Walker","state":"TX","region":"Humble","zip":"77581","lat":29.560412,"lon":-95.265315},{"name":"Elsa Ramos","state":"FL","region":"Naples","zip":"34105","lat":26.1965899,"lon":-81.7615412},{"name":"Emily Martel**","state":"SC","region":"Myrtle Beach","zip":"29577-5076","lat":33.6765192,"lon":-78.9376512},{"name":"Emsy Robinson***","state":"TX","region":"Dallas County","zip":"75228-8338","lat":32.916900575,"lon":-96.84236342499999},{"name":"Enloe Boyd III","state":"TX","region":"Dallas","zip":"75149-1872","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Eric Martinez **","state":"TX","region":"Dallas","zip":"75093-8833","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Faith Spencer","state":"TX","region":"Houston","zip":"77054","lat":29.6896918,"lon":-95.4004423},{"name":"Fiorella Cordova***","state":"FL","region":"Coral Gables","zip":"33134","lat":25.755701,"lon":-80.2701945},{"name":"Flavio Carvalho**","state":"FL","region":"South East","zip":"33442","lat":26.308067,"lon":-80.141696},{"name":"Francesca Vegas pereira*","state":"TX","region":"Dallas","zip":"75082","lat":32.9891782,"lon":-96.6660133},{"name":"Frank Moralez***","state":"TX","region":"San Antonio","zip":"78257","lat":29.6394043,"lon":-98.6098313},{"name":"Gabriel Brunelle","state":"FL","region":"West Palm Beach","zip":"33428","lat":26.3526529,"lon":-80.217067},{"name":"Gabriela Rosenthal","state":"FL","region":"South Broward","zip":"33009-6541","lat":25.9863319,"lon":-80.1436528},{"name":"Gayatri Guhanarayan","state":"GA","region":"Atlanta","zip":"30319","lat":33.8709854,"lon":-84.3431517},{"name":"George Prunes**","state":"SC","region":"Myrtle Beach","zip":"29588","lat":33.6397442,"lon":-79.0160408},{"name":"Georges Saba","state":"FL","region":"North Miami","zip":"33142-6644","lat":25.91310554166667,"lon":-80.22557064166666},{"name":"Glendora Williams**","state":"SC","region":"Columbia/South Carolina","zip":"29063","lat":34.1137532,"lon":-81.1903784},{"name":"Goldie Malul**","state":"FL","region":"South Broward","zip":"33317-4119","lat":26.88325167,"lon":-80.59497665},{"name":"Guilherme Torres","state":"TX","region":"Austin","zip":"78725","lat":30.2385625,"lon":-97.6014195},{"name":"Gustavo Gomes**","state":"FL","region":"Orlando","zip":"33896","lat":28.2545297,"lon":-81.6123804},{"name":"Gwynette Williams","state":"FL","region":"West Palm Beach","zip":"33414","lat":26.6543511,"lon":-80.2598573},{"name":"Helen Sammy**","state":"FL","region":"Pinellas County","zip":"33711-2619","lat":27.6818396,"lon":-82.594062725},{"name":"Hevany Barbosa","state":"FL","region":"orlando","zip":"32837","lat":28.3752859,"lon":-81.4105243},{"name":"Hoang Le","state":"FL","region":"Tampa","zip":"33770","lat":27.9145251,"lon":-82.8051179},{"name":"Holly Simpson","state":"GA","region":"Atlanta","zip":"30144","lat":34.0352328,"lon":-84.5943622},{"name":"Hubert Fernandez","state":"FL","region":"South Miami","zip":"33157-3900","lat":25.681355771428567,"lon":-80.31700777142858},{"name":"Ian Burney","state":"TX","region":"Dallas","zip":"75206-5781","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Inceni Cabrera","state":"FL","region":"south Miami","zip":"33155","lat":25.7393789,"lon":-80.3091416},{"name":"Isabella Jodoin","state":"TX","region":"Dallas","zip":"77096","lat":29.6773942,"lon":-95.4754401},{"name":"Jakarla Hill**","state":"GA","region":"Atlanta","zip":"30180-6993","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Janal Johnson","state":"FL","region":"Orlando","zip":"32707-3109","lat":28.459454980952376,"lon":-81.31524086666666},{"name":"Janelle Fulford","state":"FL","region":"West Palm Beach","zip":"33407-3509","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Janise Duboue","state":"FL","region":"Broward - South","zip":"33025","lat":25.9947638,"lon":-80.2782283},{"name":"Jasmine Binion***","state":"TX","region":"Houston","zip":"77375","lat":30.0581945,"lon":-95.5960857},{"name":"Jasmine Perry**","state":"TX","region":"Houston","zip":"77449","lat":29.818002,"lon":-95.7397415},{"name":"Javel Perriel***","state":"FL","region":"Orlando","zip":"32825","lat":28.5411767,"lon":-81.2446107},{"name":"Jaylimar Gonzalez","state":"FL","region":"West Palm Beach","zip":"33428-4532","lat":26.3526529,"lon":-80.217067},{"name":"Jazmine Glass**","state":"GA","region":"Atlanta","zip":"30213-4413","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Jeanne Sawyer","state":"FL","region":"West Palm Beach","zip":"33409-7218","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Jeff Kelly","state":"FL","region":"Leon county","zip":"32312-5019","lat":30.50975323333333,"lon":-84.27803273333333},{"name":"Jennifer Hock","state":"FL","region":"Jupiter","zip":"33470-4301","lat":26.7472674,"lon":-80.3016856},{"name":"Jerahmeel Boveland**","state":"GA","region":"Atlanta","zip":"30312-1303","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Jessica Cann**","state":"SC","region":"Columbia/South Carolina","zip":"29202","lat":34.0080924,"lon":-81.0341108},{"name":"Jhon Marin","state":"FL","region":"Orange county","zip":"32821","lat":28.3841983,"lon":-81.504908},{"name":"Joanne Payne**","state":"FL","region":"Orlando","zip":"32780","lat":28.5701705,"lon":-80.8202935},{"name":"Joanne Ramirez*","state":"FL","region":"New York","zip":"33470-4701","lat":26.7472674,"lon":-80.3016856},{"name":"John Nadarajan","state":"FL","region":"West Palm Beach","zip":"33484-4238","lat":26.4523848,"lon":-80.131195},{"name":"Johnny NG","state":"FL","region":"Tampa","zip":"33755-1303","lat":27.978479513333337,"lon":-82.57419381999999},{"name":"Jonah Combs**","state":"SC","region":"south carolina","zip":"29407","lat":32.7976492,"lon":-80.0041774},{"name":"Jonathan Davis","state":"FL","region":"Palm Beach County","zip":"33408","lat":26.8403867,"lon":-80.0607688},{"name":"Jordan Roberts*","state":"GA","region":"Atlanta","zip":"30324-3763","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Jose Bernal Fuentes","state":"FL","region":"north miami","zip":"33055","lat":25.9445935,"lon":-80.277454},{"name":"Jose Espinosa***","state":"FL","region":"Orlando","zip":"32805-3081","lat":28.459454980952376,"lon":-81.31524086666666},{"name":"Joshua Bernadin","state":"FL","region":"North Miami","zip":"33056","lat":25.94589,"lon":-80.2478523},{"name":"Joshua Dean","state":"GA","region":"Bibb County","zip":"31216","lat":32.7296559,"lon":-83.691787},{"name":"Joy Springfield","state":"SC","region":"South East","zip":"29483","lat":33.0350253,"lon":-80.1831854},{"name":"Julie Hodo**","state":"GA","region":"Atlanta","zip":"30331","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Julissa Roman","state":"FL","region":"North Miami","zip":"33174","lat":25.7628755,"lon":-80.358453},{"name":"Justin Hall**","state":"FL","region":"Orlando","zip":"34741","lat":28.3067412,"lon":-81.4224831},{"name":"Kamaria Annis","state":"GA","region":"Atlanta","zip":"30236","lat":33.5417909,"lon":-84.3315427},{"name":"Kami Williams**","state":"FL","region":"West Palm Beach","zip":"34997","lat":27.1380298,"lon":-80.2144831},{"name":"Kanae Chatham","state":"TX","region":"Fort Bend","zip":"77471","lat":29.5425018,"lon":-95.8070338},{"name":"Kari Mercaldi","state":"FL","region":"Tampa","zip":"34610-7745","lat":27.978479513333337,"lon":-82.57419381999999},{"name":"Kathleen owens *","state":"TX","region":"Dallas","zip":"75040","lat":32.9288437,"lon":-96.626089},{"name":"Kaylena Tran","state":"FL","region":"Tampa","zip":"33781-3942","lat":27.978479513333337,"lon":-82.57419381999999},{"name":"Kendra Rivers","state":"FL","region":"North Broward","zip":"33068-2649","lat":26.141957585714287,"lon":-80.20024878571428},{"name":"Ketly- Jean-Pierre","state":"FL","region":"North Broward","zip":"33334-1436","lat":26.141957585714287,"lon":-80.20024878571428},{"name":"Kimberly Larkins***","state":"FL","region":"Boca Raton","zip":"33020-3501","lat":26.143525750000002,"lon":-80.20289435000001},{"name":"Kinyhata Riley***","state":"GA","region":"Valdosta","zip":"31602","lat":31.0205864,"lon":-83.27477604999999},{"name":"Kisha Sallye***","state":"GA","region":"Atlanta","zip":"30060","lat":33.93871,"lon":-84.54381},{"name":"Kiya Taylor***","state":"GA","region":"Bibb County","zip":"31204-4609","lat":32.7870613,"lon":-83.68318405},{"name":"Kofi Zulu***","state":"GA","region":"Atlanta","zip":"30318","lat":33.7884182,"lon":-84.4454716},{"name":"Kristel Lynch**","state":"TX","region":"Houston","zip":"77057","lat":29.7436314,"lon":-95.4870099},{"name":"Kristen McDaniel","state":"GA","region":"Atlanta","zip":"30058-3702","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Lateashea Foster","state":"GA","region":"Atlanta","zip":"30228-5581","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Latoya Appleton-Kinsey","state":"FL","region":"North Broward","zip":"33312","lat":26.090097,"lon":-80.1798343},{"name":"Latoya Jones","state":"FL","region":"North Broward","zip":"33065","lat":26.2675311,"lon":-80.2532236},{"name":"Laura Fettig","state":"FL","region":"West Palm Beach","zip":"33403-2610","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Laurea Rambeau***","state":"FL","region":"North Miami Beach","zip":"33150","lat":25.85099,"lon":-80.20617},{"name":"Lekel Calloway*","state":"TX","region":"San Antonio","zip":"78218","lat":29.4962501,"lon":-98.4025211},{"name":"Lhara Arguinzones","state":"FL","region":"Broward","zip":"33027-3608","lat":26.074224137499996,"lon":-80.28854276249999},{"name":"Lindelwe Ndlovu**","state":"TX","region":"Collin County","zip":"75454","lat":33.2890694,"lon":-96.5632888},{"name":"Lisa Anaya","state":"TX","region":"Austin","zip":"78704-6042","lat":30.2443661,"lon":-97.7621139},{"name":"Lisa Lohman***","state":"FL","region":"Boca Raton","zip":"33433","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Lisette Kelly","state":"FL","region":"Leon county","zip":"32312","lat":30.50975323333333,"lon":-84.27803273333333},{"name":"Lori Kelman***","state":"SC","region":"Myrtle Beach","zip":"29575","lat":33.6306106,"lon":-78.9831699},{"name":"Louise Ruiz","state":"FL","region":"South Broward","zip":"33020-3513","lat":26.143525750000002,"lon":-80.20289435000001},{"name":"Lovenika Jean*","state":"FL","region":"Tampa","zip":"33823","lat":28.0760151,"lon":-81.8037808},{"name":"Lucendy Moises*","state":"FL","region":"North Miami","zip":"33168","lat":25.8920526,"lon":-80.2094661},{"name":"Lucia Panton**","state":"FL","region":"Plantation","zip":"33026-4005","lat":26.022215,"lon":-80.290749},{"name":"Lucy Weaver","state":"TX","region":"Dallas","zip":"75023-5831","lat":32.916900575,"lon":-96.84236342499999},{"name":"LuzMaria Rivera","state":"FL","region":"Tampa","zip":"33625","lat":28.0657308,"lon":-82.5590174},{"name":"Maham Choudry***","state":"TX","region":"Sugarland","zip":"77479","lat":29.5748808,"lon":-95.6196376},{"name":"Makayla Sifuentes","state":"TX","region":"Dallas","zip":"75181","lat":32.7338227,"lon":-96.5650355},{"name":"Malena Roncal","state":"FL","region":"North Broward","zip":"33334","lat":26.141957585714287,"lon":-80.20024878571428},{"name":"Mallorye Crowell","state":"GA","region":"Atlanta","zip":"30213","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Marcelo Fagundes","state":"FL","region":"Orlando","zip":"34758","lat":28.2384044,"lon":-81.4801024},{"name":"Marco Lopez","state":"TX","region":"Dallas","zip":"75224","lat":32.7117662,"lon":-96.8378561},{"name":"Marcos Da Silva***","state":"FL","region":"Orlando","zip":"32836","lat":28.3971324,"lon":-81.5318157},{"name":"Maria Elena Ruiz","state":"FL","region":"South East","zip":"33028-1240","lat":26.342222575,"lon":-80.804933425},{"name":"Maria Isabel Garcia Solorio","state":"FL","region":"North Miami","zip":"33127-2454","lat":25.91310554166667,"lon":-80.22557064166666},{"name":"Maria Perry**","state":"FL","region":"Miami Dade","zip":"33030","lat":25.4785279,"lon":-80.4874856},{"name":"Marilyn Doyle***","state":"FL","region":"Fort Lauderdale","zip":"33326-2477","lat":26.08909535,"lon":-80.32451165},{"name":"Marina Jenkins","state":"FL","region":"St. Petersburg","zip":"33513","lat":28.6586178,"lon":-82.1809948},{"name":"Marjani (Nyx) Vasquez","state":"FL","region":"Orlando","zip":"32837-5618","lat":28.3752859,"lon":-81.4105243},{"name":"Marla Flecker**","state":"TX","region":"Dallas County","zip":"75287-6626","lat":32.916900575,"lon":-96.84236342499999},{"name":"Marron Mcwilliams*","state":"TX","region":"Dallas","zip":"76001","lat":32.6372697,"lon":-97.1445998},{"name":"Martin Lanz***","state":"FL","region":"North Broward","zip":"33063","lat":26.2506954,"lon":-80.2070051},{"name":"Mary Adewusi***","state":"GA","region":"Atlanta","zip":"30030-3480","lat":33.76937,"lon":-84.28893},{"name":"Mary Brown","state":"FL","region":"Tampa","zip":"33777","lat":27.8530157,"lon":-82.7584169},{"name":"Maryloy Rodriguez","state":"FL","region":"Miami","zip":"33174","lat":25.7628755,"lon":-80.358453},{"name":"Matthew Pyle***","state":"FL","region":"West Palm Beach","zip":"33418-4589","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Mayai Carthans","state":"GA","region":"Atlanta","zip":"30122","lat":33.7751668,"lon":-84.647042},{"name":"Meagan Evans","state":"TX","region":"Houston","zip":"77071-1426","lat":29.815847015789473,"lon":-95.57579817894737},{"name":"Meggie Neol","state":"GA","region":"South East","zip":"30339-2114","lat":33.444482425000004,"lon":-83.73558725},{"name":"Melina Michkin*","state":"FL","region":"Broward","zip":"33327-1645","lat":26.1191897,"lon":-80.4124129},{"name":"Melinda Van Der Vieren*","state":"FL","region":"Tampa","zip":"33774","lat":27.8809846,"lon":-82.8270905},{"name":"Melissa Morel","state":"FL","region":"Broward","zip":"33025-3952","lat":25.9947638,"lon":-80.2782283},{"name":"Melissa Pinke**","state":"FL","region":"Pinellas County","zip":"33570","lat":27.7147263,"lon":-82.4349295},{"name":"Melissa Smith","state":"GA","region":"South East","zip":"31410","lat":32.0200084,"lon":-80.9819553},{"name":"Micah Greenwell***","state":"GA","region":"Atlanta","zip":"30141","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Michael Barone**","state":"SC","region":"Columbia/South Carolina","zip":"29073","lat":33.9267468,"lon":-81.2168738},{"name":"Michael Malamut","state":"FL","region":"West Palm Beach","zip":"33433-4661","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Micheal Amiri*","state":"FL","region":"New York","zip":"32832","lat":28.3984455,"lon":-81.229499},{"name":"Michelle Macmillian Hunter **","state":"TX","region":"Houston","zip":"77449","lat":29.818002,"lon":-95.7397415},{"name":"Michelle Saporiti","state":"FL","region":"Miami","zip":"33138-2016","lat":25.81435772857143,"lon":-80.23417071428571},{"name":"Michelle Simmons","state":"TX","region":"Dallas","zip":"75033","lat":33.179886,"lon":-96.8445012},{"name":"Miguel Ricaurte**","state":"FL","region":"West Miami","zip":"33141","lat":25.8571345,"lon":-80.1328647},{"name":"Mikael Coicou*","state":"FL","region":"North Miami","zip":"33162-5849","lat":25.91310554166667,"lon":-80.22557064166666},{"name":"Mikerria Evens","state":"FL","region":"Palm Beach county","zip":"33476-1232","lat":26.7636461,"lon":-80.52696216666666},{"name":"Monica Menasse","state":"FL","region":"North Miami","zip":"33179","lat":25.9593907,"lon":-80.1788104},{"name":"Morgan Ferschke","state":"SC","region":"south carolina","zip":"29420-7115","lat":32.9269162,"lon":-80.0954239},{"name":"Munyerenkana Euphrasie","state":"GA","region":"North Atlanta","zip":"30088","lat":33.7506897,"lon":-84.1816109},{"name":"Myriam Pierre-Charles","state":"FL","region":"North Miami","zip":"33169-4512","lat":25.91310554166667,"lon":-80.22557064166666},{"name":"Naja Barnes","state":"FL","region":"Miramar","zip":"33025","lat":25.9947638,"lon":-80.2782283},{"name":"Nakira Burton","state":"FL","region":"west palm beach","zip":"33444-1539","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Nancy Baum","state":"FL","region":"West Palm Beach","zip":"33435","lat":26.5371044,"lon":-80.0651048},{"name":"Nancy Bonise Charlemond","state":"FL","region":"South East / Miami","zip":"33150-3119","lat":25.8509926,"lon":-80.2061567},{"name":"Nasomie James","state":"FL","region":"West Palm Beach","zip":"33407-1506","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Natasha Watkins**","state":"FL","region":"Fort Lauderdale","zip":"33025-3496","lat":25.9947638,"lon":-80.2782283},{"name":"Nayra Pacheco","state":"FL","region":"West Palm Beach","zip":"33442-8006","lat":26.308067,"lon":-80.141696},{"name":"Neil Noe","state":"FL","region":"South Miami","zip":"33157-3928","lat":25.681355771428567,"lon":-80.31700777142858},{"name":"Nerman Mazhar*","state":"FL","region":"Miami","zip":"33179","lat":25.9593907,"lon":-80.1788104},{"name":"Nia Martin","state":"FL","region":"Orlando","zip":"32765","lat":28.6517186,"lon":-81.2147432},{"name":"Nicholas waltz","state":"FL","region":"West Palm Beach","zip":"33426","lat":26.5367721,"lon":-80.0844516},{"name":"Nicole Abner","state":"TX","region":"Houston","zip":"77578-4975","lat":29.815847015789473,"lon":-95.57579817894737},{"name":"Nicole Delorenzo","state":"FL","region":"West Palm Beach","zip":"33404","lat":26.7805146,"lon":-80.068262},{"name":"Nouamane Barouni*","state":"FL","region":"Broward","zip":"33314","lat":26.0675792,"lon":-80.225529},{"name":"Ogan Egeli","state":"FL","region":"Palm Beach county","zip":"33428","lat":26.3526529,"lon":-80.217067},{"name":"Oghosaikhin ( Debbie) Nehikhuere","state":"TX","region":"Houston","zip":"77469-7322","lat":29.815847015789473,"lon":-95.57579817894737},{"name":"Oluwatobiloba (Tobi) Obafemi*","state":"TX","region":"Dallas","zip":"75007-1116","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Ora Johnson**","state":"TX","region":"Houston","zip":"77379","lat":30.0447675,"lon":-95.5241863},{"name":"Orhan Demirel","state":"TX","region":"Dallas","zip":"78660","lat":30.4434758,"lon":-97.6091321},{"name":"Patricia Romero","state":"FL","region":"South Broward","zip":"33328-4524","lat":26.88325167,"lon":-80.59497665},{"name":"Patrick Anderson","state":"FL","region":"North Broward","zip":"33304","lat":26.1357243,"lon":-80.1251429},{"name":"Paula Roberson***","state":"TX","region":"Sugarland","zip":"77084","lat":29.8371924,"lon":-95.686299},{"name":"Paula Young","state":"FL","region":"South Miami","zip":"33157","lat":25.681355771428567,"lon":-80.31700777142858},{"name":"Prachi Gupta","state":"FL","region":"Boca Raton","zip":"33065-5113","lat":26.2675311,"lon":-80.2532236},{"name":"Priscilla Malekan","state":"FL","region":"North Broward","zip":"33023-1276","lat":26.141957585714287,"lon":-80.20024878571428},{"name":"Quavadas Finley**","state":"GA","region":"Atlanta","zip":"30308-2904","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Rachel Rosenthal","state":"FL","region":"South Broward","zip":"30009","lat":34.0687786,"lon":-84.2942305},{"name":"Rafael Quintana Riera*","state":"FL","region":"South East","zip":"33027","lat":26.074224137499996,"lon":-80.28854276249999},{"name":"Ragini Guha","state":"GA","region":"Atlanta","zip":"30319","lat":33.8709854,"lon":-84.3431517},{"name":"Ramona Dunlap***","state":"GA","region":"Macon","zip":"31206","lat":32.8033656,"lon":-83.6857827},{"name":"Randy Watson**","state":"TX","region":"Dallas County","zip":"75007-5087","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Raquel Waich","state":"FL","region":"Miami","zip":"33180-1828","lat":25.81435772857143,"lon":-80.23417071428571},{"name":"Rasa Ponce***","state":"SC","region":"Columbia/South Carolina","zip":"29053","lat":33.8286453,"lon":-81.1142083},{"name":"Rashawnda Smith","state":"GA","region":"Lowndes County","zip":"31601-7533","lat":31.0205864,"lon":-83.27477604999999},{"name":"Rebecca Miniel","state":"TX","region":"Fort Bend","zip":"77099-1320","lat":29.658152166666667,"lon":-95.66757493333334},{"name":"Reece Neiheisel","state":"FL","region":"Leon county","zip":"32304-3353","lat":30.50975323333333,"lon":-84.27803273333333},{"name":"Renee Dumagan","state":"TX","region":"Dallas","zip":"75149-1872","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Rinelle Berry***","state":"TX","region":"Dallas County","zip":"75034","lat":33.1353498,"lon":-96.8366067},{"name":"Robert peters**","state":"FL","region":"Orlando","zip":"32806-3478","lat":28.459454980952376,"lon":-81.31524086666666},{"name":"Robert Williams***","state":"FL","region":"Pinellas County","zip":"33705-6448","lat":27.978479513333337,"lon":-82.57419381999999},{"name":"Robin Chappell","state":"FL","region":"West Palm Beach","zip":"33446-1636","lat":26.56943966666667,"lon":-80.12808335185186},{"name":"Robyn Kolodziej***","state":"FL","region":"Tarpon Springs","zip":"34667-8582","lat":28.3705234,"lon":-82.671129},{"name":"Rosaimy Ramos","state":"FL","region":"South Miami","zip":"33155-6529","lat":25.7393789,"lon":-80.3091416},{"name":"Saitanaya (Tanya) Jayabalan","state":"TX","region":"Houston","zip":"77477-4589","lat":29.815847015789473,"lon":-95.57579817894737},{"name":"Sala Davis","state":"GA","region":"Atlanta","zip":"30309-2149","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Samantha Cantero","state":"FL","region":"Volusia County","zip":"32725-7411","lat":28.9030203,"lon":-81.2455067},{"name":"Sandhiya Thangarangan***","state":"TX","region":"Austin","zip":"78759","lat":30.3951359,"lon":-97.751909},{"name":"Sandra Mcknight**","state":"SC","region":"Columbia/South Carolina","zip":"29016","lat":34.1911532,"lon":-80.9756983},{"name":"Sara Grinbaum","state":"FL","region":"Broward","zip":"33021","lat":26.074224137499996,"lon":-80.28854276249999},{"name":"Sara Halloum","state":"FL","region":"North Broward","zip":"33328","lat":26.88325167,"lon":-80.59497665},{"name":"Sarah Anchor***","state":"FL","region":"Orlando","zip":"32806-1237","lat":28.459454980952376,"lon":-81.31524086666666},{"name":"Sarah Balogun","state":"TX","region":"Dallas","zip":"75043","lat":32.8503521,"lon":-96.6048496},{"name":"Sarah Mckay","state":"FL","region":"Tampa","zip":"33579-2143","lat":27.7946794,"lon":-82.3230538},{"name":"Sarah Rosenthal","state":"FL","region":"South Broward","zip":"33009","lat":25.9863319,"lon":-80.1436528},{"name":"Schacara Moore","state":"FL","region":"Orlando","zip":"32810","lat":28.6233373,"lon":-81.4180341},{"name":"Seyed Parsa Fatahnaei Asil","state":"TX","region":"Sugarland","zip":"77079-2367","lat":29.7771146,"lon":-95.5929882},{"name":"Sha Liu***","state":"TX","region":"Dallas County","zip":"76092-5860","lat":32.916900575,"lon":-96.84236342499999},{"name":"Shalisia Roberson*","state":"TX","region":"Dallas","zip":"75241","lat":32.6671146,"lon":-96.7790631},{"name":"Shanice Sanderson*","state":"FL","region":"Broward","zip":"33068-4613","lat":26.141957585714287,"lon":-80.20024878571428},{"name":"Shantelicia Rhodes","state":"FL","region":"Pompano Beach","zip":"33311","lat":26.1452914,"lon":-80.1786585},{"name":"Sharon Burgess**","state":"SC","region":"Columbia/South Carolina","zip":"29223","lat":34.093861,"lon":-80.9260891},{"name":"Sharon Maharaj*","state":"FL","region":"West palm Beach","zip":"33463","lat":26.6127201,"lon":-80.1250168},{"name":"Sharon Mathis***","state":"GA","region":"Lowndes County","zip":"31794-9054","lat":31.0205864,"lon":-83.27477604999999},{"name":"shawnnelle white**","state":"GA","region":"Atlanta","zip":"30273","lat":33.584252,"lon":-84.2774994},{"name":"Shelli Betzalel","state":"FL","region":"Fort Lauderdale","zip":"33328-6710","lat":26.88325167,"lon":-80.59497665},{"name":"Sherry Galvez*","state":"TX","region":"HOuston","zip":"77095","lat":29.8966922,"lon":-95.6534761},{"name":"Shon Barnwell***","state":"SC","region":"Dorchester","zip":"29486-8539","lat":33.0635198,"lon":-80.1351601},{"name":"Shondricia Bulaba**","state":"GA","region":"Atlanta","zip":"30350","lat":33.9762157,"lon":-84.3232704},{"name":"Simon pereyra iraola **","state":"FL","region":"Miami","zip":"33160","lat":25.940674,"lon":-80.1341422},{"name":"Sivan Saar","state":"FL","region":"North Miami","zip":"33314-7200","lat":26.0675792,"lon":-80.225529},{"name":"Skyler Munson*","state":"GA","region":"Chattanooga","zip":"30741","lat":34.9580335,"lon":-85.2787985},{"name":"Smathe Toles","state":"SC","region":"south carolina","zip":"29907","lat":32.4474036,"lon":-80.6421242},{"name":"Stacey Maddox**","state":"SC","region":"Myrtle Beach","zip":"29577","lat":33.6765192,"lon":-78.9376512},{"name":"Stephanie Farah","state":"FL","region":"Orlando","zip":"32828-7524","lat":28.459454980952376,"lon":-81.31524086666666},{"name":"Stephanie Mami**","state":"TX","region":"Houston","zip":"77067-5214","lat":29.815847015789473,"lon":-95.57579817894737},{"name":"Suzanne Banas","state":"FL","region":"South Miami","zip":"33155","lat":25.7393789,"lon":-80.3091416},{"name":"Tammie Epps**","state":"SC","region":"Columbia/South Carolina","zip":"29063-7951","lat":34.1137532,"lon":-81.1903784},{"name":"Tanisha Mauriello","state":"FL","region":"Tampa","zip":"34609","lat":28.4737142,"lon":-82.5116675},{"name":"Tashia Zeigler **","state":"GA","region":"South East","zip":"30067","lat":33.9284485,"lon":-84.4701537},{"name":"Terry Budebo","state":"FL","region":"North Miami","zip":"33138","lat":25.81435772857143,"lon":-80.23417071428571},{"name":"Themy Dupin","state":"FL","region":"North Miami","zip":"33179","lat":25.9593907,"lon":-80.1788104},{"name":"Theodore Slade***","state":"FL","region":"Orlando","zip":"34772-7964","lat":28.459454980952376,"lon":-81.31524086666666},{"name":"Therese Kominski","state":"FL","region":"Tampa","zip":"33549","lat":28.1327351,"lon":-82.45136},{"name":"Tiffany Cheatham***","state":"FL","region":"Plantation","zip":"33025-4657","lat":25.9947638,"lon":-80.2782283},{"name":"Tremayne Horne","state":"GA","region":"Atlanta","zip":"30038-3368","lat":33.76162779677419,"lon":-84.43905728709677},{"name":"Triston Edwards","state":"GA","region":"Atlanta","zip":"30083-6817","lat":33.8052405,"lon":-84.2030611},{"name":"Uriah Long **","state":"GA","region":"South East","zip":"30153-5239","lat":33.444482425000004,"lon":-83.73558725},{"name":"Vanessa taylor**","state":"FL","region":"Pahokee","zip":"33476-2208","lat":26.7636461,"lon":-80.52696216666666},{"name":"Victoria Gonzalez***","state":"FL","region":"Plantation","zip":"33018-6569","lat":25.9012,"lon":-80.34975},{"name":"Victoria Myers","state":"TX","region":"Dallas","zip":"75254","lat":32.9488848,"lon":-96.8097992},{"name":"Vincynthia Jones***","state":"FL","region":"Pahokee","zip":"33414","lat":26.6543511,"lon":-80.2598573},{"name":"Viva Lease","state":"FL","region":"Tampa","zip":"33770-1143","lat":27.9145251,"lon":-82.8051179},{"name":"Wendy Dolcima","state":"FL","region":"Pompano Beach","zip":"33068","lat":26.141957585714287,"lon":-80.20024878571428},{"name":"WIlliam Kocak","state":"TX","region":"Dallas","zip":"76201-3933","lat":32.71456235172414,"lon":-96.75339762758618},{"name":"Xavier Maldonado**","state":"FL","region":"Orlando","zip":"32808-4932","lat":28.459454980952376,"lon":-81.31524086666666},{"name":"Yan Huo*","state":"TX","region":"Dallas","zip":"75098","lat":33.0202819,"lon":-96.56135},{"name":"Yesenia Candelario","state":"FL","region":"South Broward","zip":"33020-6349","lat":26.143525750000002,"lon":-80.20289435000001},{"name":"Yutong Pan **","state":"TX","region":"Dallas County","zip":"75034-7239","lat":33.1353498,"lon":-96.8366067},{"name":"Zazy Chensritong","state":"GA","region":"Atlanta","zip":"30041-9363","lat":34.1850334,"lon":-84.106798},{"name":"Zoe Zelner***","state":"FL","region":"Orlando","zip":"32952","lat":28.3748607,"lon":-80.671047},{"name":"Zoha Wamiq","state":"TX","region":"Houston","zip":"77406-7228","lat":29.815847015789473,"lon":-95.57579817894737}];
+
+function siteHasOpen(s){ return s.classes.some(c => c.status === 'open'); }
+function siteAllFilled(s){ return s.classes.every(c => c.status === 'filled'); }
+
+// ---- MAP ----
+const OFM_STYLES = {
+  light: 'https://tiles.openfreemap.org/styles/bright',
+  dark: 'https://tiles.openfreemap.org/styles/dark'
+};
+let currentStyleKey = 'light';
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: OFM_STYLES[currentStyleKey],
+  center: [-90, 29.5],
+  zoom: 5
+});
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+class StyleToggleControl {
+  onAdd(mapInstance) {
+    this._map = mapInstance;
+    this._container = document.createElement('div');
+    this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group style-toggle-ctrl';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = 'Switch light / dark map style';
+    btn.textContent = currentStyleKey === 'light' ? '🌙' : '☀️';
+    btn.addEventListener('click', () => {
+      currentStyleKey = currentStyleKey === 'light' ? 'dark' : 'light';
+      btn.textContent = currentStyleKey === 'light' ? '🌙' : '☀️';
+      mapInstance.setStyle(OFM_STYLES[currentStyleKey]);
+    });
+    this._container.appendChild(btn);
+    return this._container;
+  }
+  onRemove() {
+    this._container.parentNode.removeChild(this._container);
+    this._map = undefined;
+  }
+}
+map.addControl(new StyleToggleControl(), 'bottom-right');
+
+// Deep-zoom detail overlay: OpenFreeMap's public vector tiles cap at zoom 14, so past that
+// point they just scale up rather than adding new detail. To match Leaflet's dense
+// business/school labeling when fully zoomed in, layer the classic OSM raster tiles on
+// top starting at zoom 15 (re-added after every style switch since setStyle clears layers).
+function addDetailOverlay() {
+  if (map.getSource('osm-raster')) return;
+  map.addSource('osm-raster', {
+    type: 'raster',
+    tiles: [
+      'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    ],
+    tileSize: 256,
+    maxzoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  });
+  map.addLayer({
+    id: 'osm-raster-detail',
+    type: 'raster',
+    source: 'osm-raster',
+    minzoom: 12,
+    paint: { 'raster-opacity': 1 }
+  });
+}
+map.on('style.load', addDetailOverlay);
+
+const bounds = new maplibregl.LngLatBounds();
+const siteMarkers = [];
+DATA.forEach(s => {
+  const openCount = s.classes.filter(c => c.status === 'open').length;
+  const filledCount = s.classes.length - openCount;
+  let color = '#37c977';
+  if (openCount > 0 && filledCount > 0) color = '#ffb545';
+  else if (openCount > 0) color = '#ff6b5e';
+
+  const el = document.createElement('div');
+  el.className = 'site-marker';
+  el.style.background = color;
+
+  let popupHtml = `<div class="popup-title">${s.name}</div>`;
+  popupHtml += `<div class="popup-addr">${s.address}, ${s.city}, ${s.state} ${s.zip} &middot; ${s.region}</div>`;
+  s.classes.forEach(c => {
+    const statusTxt = c.status === 'open'
+      ? '<span style="color:#ff6b5e;font-weight:700;">OPEN</span>'
+      : `<span style="color:#37c977;">${c.instructor || 'Filled'}</span>`;
+    const timeTxt = c.time ? ` <span style="color:var(--muted);">(${c.time})</span>` : '';
+    const startTxt = c.startDate ? ` <span style="color:var(--muted);">· starts ${c.startDate}</span>` : '';
+    popupHtml += `<div class="popup-class"><b>${c.program}</b>${c.course ? ' — ' + c.course : ''}${timeTxt}${startTxt} · ${statusTxt}</div>`;
+  });
+
+  const popup = new maplibregl.Popup({ maxWidth: '320px', offset: 14, closeButton: false }).setHTML(popupHtml);
+  const marker = new maplibregl.Marker({ element: el }).setLngLat([s.lon, s.lat]).setPopup(popup).addTo(map);
+
+  let hoverCloseTimer = null;
+  function cancelSiteClose(){ if (hoverCloseTimer) { clearTimeout(hoverCloseTimer); hoverCloseTimer = null; } }
+  function scheduleSiteClose(){ hoverCloseTimer = setTimeout(() => { if (popup.isOpen()) marker.togglePopup(); }, 200); }
+  el.addEventListener('mouseenter', () => { cancelSiteClose(); if (!popup.isOpen()) marker.togglePopup(); });
+  el.addEventListener('mouseleave', scheduleSiteClose);
+  popup.on('open', () => {
+    const popupEl = popup.getElement();
+    if (popupEl) {
+      popupEl.addEventListener('mouseenter', cancelSiteClose);
+      popupEl.addEventListener('mouseleave', scheduleSiteClose);
+    }
+  });
+
+  bounds.extend([s.lon, s.lat]);
+  siteMarkers.push(marker);
+});
+
+const instructorMarkers = [];
+INSTRUCTORS.forEach(ins => {
+  const el = document.createElement('div');
+  el.className = 'instructor-marker';
+
+  const popup = new maplibregl.Popup({ maxWidth: '280px', offset: 10 }).setHTML(
+    '<div class="popup-title">🧑 ' + ins.name + '</div><div class="popup-addr">' + ins.region + ', ' + ins.state + ' · zip ' + ins.zip + ' (approximate)</div>'
+  );
+  const marker = new maplibregl.Marker({ element: el }).setLngLat([ins.lon, ins.lat]).setPopup(popup).addTo(map);
+  instructorMarkers.push(marker);
+});
+
+// ---- ADDRESS SEARCH ----
+let addressMarker = null;
+async function runAddressSearch(){
+  const input = document.getElementById('addressSearch');
+  const btn = document.getElementById('addressSearchBtn');
+  const status = document.getElementById('addrSearchStatus');
+  const q = input.value.trim();
+  status.textContent = '';
+  status.classList.remove('error');
+  if (!q) return;
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  status.textContent = 'Searching…';
+
+  try {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 8000);
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q);
+    const res = await fetch(url, { signal: ctrl.signal, headers: { 'Accept-Language': 'en' } });
+    clearTimeout(timeout);
+    const results = await res.json();
+
+    if (!results || results.length === 0) {
+      status.textContent = 'No results found for “' + q + '”';
+      status.classList.add('error');
+      return;
+    }
+
+    const r = results[0];
+    const lat = parseFloat(r.lat);
+    const lon = parseFloat(r.lon);
+
+    if (addressMarker) addressMarker.remove();
+
+    const el = document.createElement('div');
+    el.className = 'address-marker';
+    el.textContent = '📍';
+
+    const popup = new maplibregl.Popup({ maxWidth: '280px', offset: 24 }).setHTML(
+      '<div class="popup-title">Searched location</div><div class="popup-addr">' + r.display_name + '</div>'
+    );
+
+    addressMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([lon, lat]).setPopup(popup).addTo(map);
+    map.flyTo({ center: [lon, lat], zoom: 16, essential: true });
+    addressMarker.togglePopup();
+    status.textContent = '';
+  } catch (e) {
+    status.textContent = 'Search failed — try again';
+    status.classList.add('error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Go';
+  }
+}
+
+function comboSearchRun(){
+  const box = document.getElementById('comboSearch');
+  const resultsEl = document.getElementById('comboResults');
+  const q = box.value.trim().toLowerCase();
+  if (!q) { resultsEl.classList.remove('open'); resultsEl.innerHTML = ''; return; }
+
+  const siteMatches = [];
+  DATA.forEach((s, idx) => {
+    const hay = (s.name + ' ' + s.city + ' ' + s.region + ' ' + s.state).toLowerCase();
+    if (hay.includes(q)) siteMatches.push(idx);
+  });
+  const instrMatches = [];
+  INSTRUCTORS.forEach((ins, idx) => {
+    const hay = (ins.name + ' ' + ins.region + ' ' + ins.state + ' ' + ins.zip).toLowerCase();
+    if (hay.includes(q)) instrMatches.push(idx);
+  });
+
+  if (siteMatches.length === 0 && instrMatches.length === 0) {
+    resultsEl.innerHTML = '<div class="combo-result-empty">No sites or instructors match “' + box.value + '”</div>';
+  } else {
+    let html = '';
+    siteMatches.slice(0, 15).forEach(idx => {
+      const s = DATA[idx];
+      html += '<div class="combo-result-item" data-type="site" data-idx="' + idx + '"><b>' + s.name + '</b><span class="combo-tag site">Site</span></div>';
+    });
+    instrMatches.slice(0, 15).forEach(idx => {
+      const ins = INSTRUCTORS[idx];
+      html += '<div class="combo-result-item" data-type="instructor" data-idx="' + idx + '"><b>' + ins.name + ' — ' + ins.region + '</b><span class="combo-tag instructor">Instructor</span></div>';
+    });
+    resultsEl.innerHTML = html;
+    resultsEl.querySelectorAll('.combo-result-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.getAttribute('data-idx'), 10);
+        const type = el.getAttribute('data-type');
+        if (type === 'site') selectSite(idx); else selectInstructorResult(idx);
+      });
+    });
+  }
+  resultsEl.classList.add('open');
+}
+
+function selectSite(idx){
+  const s = DATA[idx];
+  const marker = siteMarkers[idx];
+  map.flyTo({ center: [s.lon, s.lat], zoom: 14, essential: true });
+  if (!marker.getPopup().isOpen()) marker.togglePopup();
+  document.getElementById('comboResults').classList.remove('open');
+  document.getElementById('comboSearch').value = s.name;
+}
+
+function selectInstructorResult(idx){
+  const ins = INSTRUCTORS[idx];
+  const marker = instructorMarkers[idx];
+  const cb = document.getElementById('toggleInstructors');
+  if (!cb.checked) { cb.checked = true; toggleInstructorLayer(); }
+  map.flyTo({ center: [ins.lon, ins.lat], zoom: 14, essential: true });
+  if (!marker.getPopup().isOpen()) marker.togglePopup();
+  document.getElementById('comboResults').classList.remove('open');
+  document.getElementById('comboSearch').value = ins.name;
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.combo-search-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('comboResults').classList.remove('open');
+  }
+});
+
+function toggleInstructorLayer(){
+  const cb = document.getElementById('toggleInstructors');
+  instructorMarkers.forEach(m => { if (cb.checked) m.addTo(map); else m.remove(); });
+}
+
+if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 40, maxZoom: 12, duration: 0 });
+
+// ---- LIST ----
+function renderList(){
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  const stateF = document.getElementById('stateFilter').value;
+  const statusF = document.getElementById('statusFilter').value;
+
+  // group by region+state
+  const groups = {};
+  DATA.forEach(s => {
+    if (stateF && s.state !== stateF) return;
+    if (statusF === 'open' && !siteHasOpen(s)) return;
+    if (statusF === 'filled' && !siteAllFilled(s)) return;
+
+    const searchable = [s.name, s.city, s.region, s.state, ...s.classes.map(c => c.program + ' ' + (c.course||''))].join(' ').toLowerCase();
+    if (q && !searchable.includes(q)) return;
+
+    const key = s.region + '|' + s.state;
+    groups[key] = groups[key] || [];
+    groups[key].push(s);
+  });
+
+  const keys = Object.keys(groups).sort((a,b) => a.localeCompare(b));
+  const main = document.getElementById('mainList');
+  if (keys.length === 0) {
+    main.innerHTML = '<p style="color:var(--muted);margin-top:30px;">No sites match your filters.</p>';
+    return;
+  }
+
+  let out = '';
+  keys.forEach(key => {
+    const [region, state] = key.split('|');
+    const sites = groups[key].sort((a,b) => a.name.localeCompare(b.name));
+    const openTotal = sites.reduce((n,s) => n + s.classes.filter(c=>c.status==='open').length, 0);
+    const filledTotal = sites.reduce((n,s) => n + s.classes.filter(c=>c.status==='filled').length, 0);
+
+    out += `<div class="region-block">
+      <div class="region-title">${region} <span class="state-tag">${state}</span>
+      <span class="count">${sites.length} site${sites.length!==1?'s':''} · ${openTotal} open · ${filledTotal} filled</span></div>
+      <div class="site-grid">`;
+
+    sites.forEach(s => {
+      const hasOpen = siteHasOpen(s);
+      const openClasses = s.classes.filter(c => c.status === 'open');
+      const filledClasses = s.classes.filter(c => c.status === 'filled');
+      const cardClasses = ['site-card', hasOpen ? '' : 'no-open', filledClasses.length > 0 ? 'filled-hover-wrap' : ''].filter(Boolean).join(' ');
+
+      out += `<div class="${cardClasses}">
+        <div class="site-name">📍 ${s.name}</div>
+        <div class="site-loc">${s.city}, ${s.state} &middot; ${s.address} ${s.zip}</div>`;
+
+      openClasses.forEach(c => {
+        const timeTxt = c.time ? ` <span style="color:var(--muted);font-size:11px;">(${c.time})</span>` : '';
+        out += `<div class="class-row"><span class="prog">📘 ${c.program}</span>${c.course ? ' — ' + c.course : ''}${timeTxt}<span class="badge open">OPEN</span></div>`;
+      });
+
+      const filledDetailsHtml = filledClasses.map(c => {
+        const timeTxt = c.time ? ` <span style="color:var(--muted);">(${c.time})</span>` : '';
+        return `<div class="filled-detail-row"><b>${c.program}</b>${c.course ? ' — ' + c.course : ''}${timeTxt} · <span style="color:var(--filled);">${c.instructor || 'Filled'}</span></div>`;
+      }).join('');
+
+      if (openClasses.length === 0 && filledClasses.length > 0) {
+        out += `<div class="no-open-note">No open placements — fully staffed (${filledClasses.length} class${filledClasses.length!==1?'es':''})<span class="hint">hover for details</span></div>`;
+      } else if (filledClasses.length > 0) {
+        out += `<div class="class-row filled">+ ${filledClasses.length} filled class${filledClasses.length!==1?'es':''} at this site<span class="hint">hover for details</span></div>`;
+      }
+      if (filledClasses.length > 0) {
+        out += `<div class="filled-details">${filledDetailsHtml}</div>`;
+      }
+      out += `</div>`;
+    });
+
+    out += `</div></div>`;
+  });
+
+  main.innerHTML = out;
+}
+renderList();
+</script>
+</body>
+</html>
