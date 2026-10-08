@@ -2,13 +2,11 @@ name: Sync dashboard from sandbox
 
 on:
   schedule:
-    # 06:00, 12:00 and 17:00 America/Chicago.
-    # Cron is UTC and does not observe DST, so these are CDT (UTC-5) times.
-    # Between early Nov and mid Mar they land an hour later in local time.
-    - cron: '0 11 * * *'
-    - cron: '0 17 * * *'
-    - cron: '0 22 * * *'
-  workflow_dispatch:        # lets you run it on demand from the Actions tab
+    # Hourly across the widest UTC span that can contain 06:00-17:00 Eastern.
+    # Cron is UTC and ignores daylight saving, so the window is enforced in the
+    # job itself (see the 'Check Eastern-time window' step) rather than here.
+    - cron: '0 10-22 * * *'
+  workflow_dispatch:        # run on demand from the Actions tab (ignores the window)
 
 concurrency:
   group: dashboard-sync
@@ -23,24 +21,44 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      - name: Check Eastern-time window
+        id: window
+        run: |
+          HOUR=$(TZ=America/New_York date +%-H)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run — skipping the time-window check."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$HOUR" -ge 6 ] && [ "$HOUR" -le 17 ]; then
+            echo "${HOUR}:00 ET — inside the 6am-5pm window, syncing."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "${HOUR}:00 ET — outside the 6am-5pm window, skipping."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out repository
+        if: steps.window.outputs.run == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node
+        if: steps.window.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install dependencies
+        if: steps.window.outputs.run == 'true'
         run: npm install cheerio@1.0.0 --no-save --no-audit --no-fund
 
       - name: Scrape sandbox and rebuild index.html
+        if: steps.window.outputs.run == 'true'
         env:
           NEX_EMAIL: ${{ secrets.NEX_EMAIL }}
           NEX_PASSWORD: ${{ secrets.NEX_PASSWORD }}
         run: node scripts/sync.js
 
       - name: Commit if the data changed
+        if: steps.window.outputs.run == 'true'
         run: |
           if git diff --quiet -- index.html; then
             echo "No change — sandbox data is identical to what is published."
@@ -49,5 +67,5 @@ jobs:
           git config user.name  "nexplore-sync[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Auto-sync from sandbox ($(TZ=America/Chicago date '+%d %b %Y, %-I:%M %p %Z'))"
+          git commit -m "Auto-sync from sandbox ($(TZ=America/New_York date '+%d %b %Y, %-I:%M %p %Z'))"
           git push
