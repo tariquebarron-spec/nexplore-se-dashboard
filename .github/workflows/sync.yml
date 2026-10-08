@@ -2,10 +2,12 @@ name: Sync dashboard from sandbox
 
 on:
   schedule:
-    # Hourly across the widest UTC span that can contain 06:00-17:00 Eastern.
-    # Cron is UTC and ignores daylight saving, so the window is enforced in the
-    # job itself (see the 'Check Eastern-time window' step) rather than here.
-    - cron: '0 10-22 * * *'
+    # Once a day at 06:00 America/New_York.
+    # Cron is UTC and ignores daylight saving, so both candidate hours are listed
+    # (10:00 UTC = 6am EDT, 11:00 UTC = 6am EST) and the job itself keeps whichever
+    # one is actually 6am Eastern today. See the 'Check Eastern-time window' step.
+    - cron: '0 10 * * *'
+    - cron: '0 11 * * *'
   workflow_dispatch:        # run on demand from the Actions tab (ignores the window)
 
 concurrency:
@@ -26,13 +28,13 @@ jobs:
         run: |
           HOUR=$(TZ=America/New_York date +%-H)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual run — skipping the time-window check."
+            echo "Manual run — skipping the time check."
             echo "run=true" >> "$GITHUB_OUTPUT"
-          elif [ "$HOUR" -ge 6 ] && [ "$HOUR" -le 17 ]; then
-            echo "${HOUR}:00 ET — inside the 6am-5pm window, syncing."
+          elif [ "$HOUR" -eq 6 ]; then
+            echo "${HOUR}:00 ET — daily sync window, running."
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "${HOUR}:00 ET — outside the 6am-5pm window, skipping."
+            echo "${HOUR}:00 ET — not 6am Eastern, skipping (the other cron will fire)."
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
